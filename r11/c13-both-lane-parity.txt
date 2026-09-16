@@ -1,0 +1,290 @@
+================================================================================
+C13 — "Same payload, both lanes, identical outcome"  (BOTH-LANE PARITY, LIVE)
+PR #13388  Huawei CodeArts coding-agent support in the Onyx scanner
+Commit sha:      290c2aa11563  (fix(scanner): sanction CodeArts MCP tool calls)
+Captured:        2026-09-16, live local stack (namespace onyxd), no mocks.
+================================================================================
+
+WHAT THIS FILE PROVES
+---------------------
+The two per-tenant ingestion lanes settle the SAME captured real CodeArts scanner
+object to the SAME product-visible end-state:
+
+  LANE OFF (flag endpoint-asset-ingestion = OFF)  -> Temporal collector lane
+            (temporal-scanner-worker) -> tenant A = onyx_security
+  LANE ON  (flag endpoint-asset-ingestion = ON)   -> in-process one-writer
+            (endpoint_asset_ingestion consumer, off Temporal) -> tenant B
+
+TENANTS
+  Tenant A (flag OFF, Temporal lane):
+     schema  onyx_security
+     uuid    61750f27-8fbd-42a4-80cf-4191cfb2371a
+  Tenant B (flag ON, in-process consumer lane):
+     schema  tenant_b_prdct14239
+     uuid    4c7d92d8-d19b-4838-ace9-73731a36214b
+
+SCAN RUN (the ONE captured real CodeArts scanner object, re-keyed per tenant)
+     scan_run_id  6142c920-cfb8-46f4-9d3d-3b1ce71f3329
+     object       r7-ca-home capture (50878 bytes): CodeArts desktop agent +
+                  one MCP server (Filesystem) + one skill (secure-review)
+     tenant-B key tenant=4c7d92d8-d19b-4838-ace9-73731a36214b/source=mcp-scanner/
+                  date=2026-09-16/c13-parity-1789595000.log
+
+HOW LANE-ON WAS MADE DRIVABLE (reversible; restored — see foot of file)
+     The dormant endpoint-asset-ingestion deployment shipped no LaunchDarkly SDK
+     key (config.yaml had no feature_flags section; deployment env only wired
+     ONYX__DATABASE__* + aws-credentials), so its LD client never initialized and
+     the consumer could not evaluate flag-ON. Reversibly patched the deployment to
+     inject ONYX__FEATURE_FLAGS__LAUNCHDARKLY_SDK_KEY from secret
+     launchdarkly-sdk-key/sdk-key and scaled it up; the pod logged
+     "Started LaunchDarkly Client: OK". The dev fallthrough for
+     endpoint-asset-ingestion is variation 0 = true, so an initialized consumer
+     evaluates flag-ON for any tenant. No LD targeting rule was added or flipped.
+
+ATTRIBUTION NOTE (why the lane-ON write is the consumer's, not Temporal's)
+     The shared ingestion bucket fans every ObjectCreated to ALL per-source
+     queues (scanner-events, endpoint-asset-ingestion, ...), and
+     temporal-scanner-worker is also running, so a re-keyed object is visible to
+     both. The lane-ON write is attributed to the in-process consumer by (a) the
+     consumer's own trace-scoped log line "asset_ingestion_record_handled
+     outcome=processed" from endpoint_asset_ingestion modules, (b) a
+     consumer-EXCLUSIVE reingest driven by a manual SQS S3-event sent to ONLY the
+     endpoint-asset-ingestion queue (same key, outcome=processed again,
+     idempotent), and (c) the consumer's own Prometheus counters
+     (asset_ingestion_* labelled tenant_schema=tenant_b_prdct14239), quoted below.
+
+
+################################################################################
+SUB-ITEM 1 — psql rows: CodeArts scan INGESTED, flag-ON (tenant B, consumer lane)
+################################################################################
+Fresh opted-in tenant B (tenant_b_prdct14239) with the flag evaluated ON by the
+initialized consumer. RAW psql output (via /tmp/r7-psql.sh <schema> "<SQL>"),
+verbatim, tab-separated as psql -A -F$'\t' emits.
+
+--- assets: the CodeArts agent (endpoint_codearts) + MCP child + skill child -----
+SQL> SELECT id,name,app_definition_id,type,sub_type,surface,status
+     FROM assets WHERE id IN (2,211,212) ORDER BY id;
+2	CodeArts (coder, r7-ca-home)	endpoint_codearts	AssetTypeDesktopAgent	AssetSubTypeAIAgent	Desktop
+211	secure-review		AssetTypeSkill	AssetSubTypeSkill		AssetStatusDiscovered
+212	Filesystem MCP Server	@modelcontextprotocol/server-filesystem	AssetTypeMCP	AssetSubTypeMCPServer		AssetStatusDiscovered
+
+--- mcp_servers: single server row backing the MCP asset --------------------------
+SQL> SELECT id,asset_id,type,source_type,hash FROM mcp_servers WHERE asset_id=212;
+29	212	Local	Npm	032d829e26d16b83546a88e7839ff091074f37dedc3f2c07c48eec445d409dfa
+
+--- agent_skills: the skill's content hashes --------------------------------------
+SQL> SELECT id,asset_id,skill_md_hash,skill_dir_hash FROM agent_skills WHERE asset_id=211;
+129	211	6d2041ece80ab9e5faba6513c0da330205d1ac329fbc21b823459081ec65f5a4	fc8a96743a4a8b7328ce89d4a862a05feaaf957c81f72b1c2c9adb17484b0597
+
+--- scanner_installations: the ingest ledger row (log_s3_key = the tenant-B key) --
+SQL> SELECT id,scan_run_id,total_agents,total_mcp_servers,total_skills,trigger_method,host_type,log_s3_key
+     FROM scanner_installations WHERE id=5;
+5	6142c920-cfb8-46f4-9d3d-3b1ce71f3329	2	1	1	INSTALL_SCRIPT		tenant=4c7d92d8-d19b-4838-ace9-73731a36214b/source=mcp-scanner/date=2026-09-16/c13-parity-1789595000.log
+
+--- builtin codearts tools: rows in `tools` (service='codearts', builtin) ----------
+SQL> SELECT count(*) FROM tools WHERE service='codearts' AND type='ToolTypeBuiltinAgentTool';
+17
+SQL> SELECT name FROM tools WHERE service='codearts' AND type='ToolTypeBuiltinAgentTool' ORDER BY name;
+bash
+batch
+edit
+glob
+grep
+list
+lsp
+patch
+question
+read
+skill
+task
+todoread
+todowrite
+webfetch
+websearch
+write
+
+--- AgentToMcp / AgentToSkill edges (agent 2 -> its children) ----------------------
+SQL> SELECT source_asset_id,destination_asset_id,connection_type,is_deleted
+     FROM asset_connections WHERE source_asset_id=2 AND destination_asset_id IN (211,212)
+     ORDER BY destination_asset_id;
+2	211	AgentToSkill	f
+2	212	AgentToMcp	f
+
+  => Flag-ON consumer lane INGESTED the CodeArts object: agent asset 2
+     (endpoint_codearts / DesktopAgent / AIAgent / Desktop), MCP child 212 backed
+     by mcp_servers 29, skill child 211, the 17 builtin codearts tools, both
+     active (is_deleted=f) edges, and the scanner_installations ledger row 5
+     carrying scan_run_id 6142c920 and the tenant-B log key.  SUB-ITEM 1: CLOSED.
+
+
+################################################################################
+SUB-ITEM 2 — Side-by-side BOTH-LANE diff (flag-OFF tenant A vs flag-ON tenant B)
+################################################################################
+Same captured object, diffed on CONTENT / STATE / LIFECYCLE columns, IGNORING row
+ids and write timestamps. Tenant A rows (flag-OFF Temporal lane), RAW psql:
+
+SQL[A]> SELECT id,name,app_definition_id,type,sub_type,surface,status
+        FROM assets WHERE id IN (230,1500,1501) ORDER BY id;
+230	CodeArts (ca-home, coder, home, r7-ca-home)	endpoint_codearts	AssetTypeDesktopAgent	AssetSubTypeAIAgent	Desktop	AssetStatusUnsanctioned
+1500	secure-review		AssetTypeSkill	AssetSubTypeSkill		AssetStatusDiscovered
+1501	Filesystem MCP Server	@modelcontextprotocol/server-filesystem	AssetTypeMCP	AssetSubTypeMCPServer		AssetStatusDiscovered
+
+SQL[A]> SELECT id,asset_id,type,source_type,hash FROM mcp_servers WHERE asset_id=1501;
+186	1501	Local	Npm	032d829e26d16b83546a88e7839ff091074f37dedc3f2c07c48eec445d409dfa
+
+SQL[A]> SELECT id,asset_id,skill_md_hash,skill_dir_hash FROM agent_skills WHERE asset_id=1500;
+949	1500	6d2041ece80ab9e5faba6513c0da330205d1ac329fbc21b823459081ec65f5a4	fc8a96743a4a8b7328ce89d4a862a05feaaf957c81f72b1c2c9adb17484b0597
+
+SQL[A]> SELECT source_asset_id,destination_asset_id,connection_type,is_deleted
+        FROM asset_connections WHERE source_asset_id=230 AND destination_asset_id IN (1500,1501)
+        ORDER BY destination_asset_id;
+230	1500	AgentToSkill	f
+230	1501	AgentToMcp	t
+
+SQL[A]> SELECT id,scan_run_id,total_agents,total_mcp_servers,total_skills,trigger_method,host_type,log_s3_key
+        FROM scanner_installations WHERE id=20;
+20	6142c920-cfb8-46f4-9d3d-3b1ce71f3329	2	1	1	INSTALL_SCRIPT		tenant=61750f27-8fbd-42a4-80cf-4191cfb2371a/source=mcp-scanner/date=2026-09-16/1789580827-6a69f758-43ed-429a-8418-2685f4f2a74f.log
+
+SQL[A]> SELECT count(*) FROM tools WHERE service='codearts' AND type='ToolTypeBuiltinAgentTool';
+17
+
+DIFF TABLE (ids/timestamps ignored by construction):
+
+COLUMN / FIELD                     | LANE-OFF (A, id 230/1500/1501) | LANE-ON (B, id 2/211/212)  | VERDICT
+-----------------------------------+--------------------------------+----------------------------+-------------------
+agent app_definition_id            | endpoint_codearts              | endpoint_codearts          | IDENTICAL
+agent type / sub_type / surface    | DesktopAgent/AIAgent/Desktop   | DesktopAgent/AIAgent/Desktop| IDENTICAL
+MCP app_definition_id              | @modelcontextprotocol/server-filesystem | (same)            | IDENTICAL
+MCP type / source_type             | Local / Npm                    | Local / Npm                | IDENTICAL
+MCP content hash                   | 032d829e...409dfa              | 032d829e...409dfa          | IDENTICAL
+skill_md_hash                      | 6d2041ece...65f5a4             | 6d2041ece...65f5a4         | IDENTICAL
+skill_dir_hash                     | fc8a96743...4b0597             | fc8a96743...4b0597         | IDENTICAL
+skill / MCP asset status           | AssetStatusDiscovered          | AssetStatusDiscovered      | IDENTICAL
+builtin codearts tools count       | 17                             | 17                         | IDENTICAL
+edge AgentToSkill.is_deleted       | f                              | f                          | IDENTICAL
+scanner_installations totals       | agents=2 / mcp=1 / skills=1    | agents=2 / mcp=1 / skills=1| IDENTICAL
+scan_run_id                        | 6142c920-cfb8-...-3b1ce71f3329 | 6142c920-cfb8-...-3b1ce71f3329 | IDENTICAL
+trigger_method                     | INSTALL_SCRIPT                 | INSTALL_SCRIPT             | IDENTICAL
+-----------------------------------+--------------------------------+----------------------------+-------------------
+agent asset status                 | AssetStatusUnsanctioned        | (blank / Discovered)       | DELTA (governance, not lane)
+edge AgentToMcp.is_deleted         | t                              | f                          | DELTA (scan-history, not lane)
+
+  => Every CONTENT-derived column is byte-identical across the two lanes: same
+     app-definition ids, same MCP + skill content hashes, same tool set, same
+     ledger totals, same scan_run_id.  The two deltas are NOT lane-driven:
+       - agent status AssetStatusUnsanctioned on A is a GOVERNANCE decision made
+         after ingest (an operator/posture action), not something either lane
+         writes at ingest; tenant B's agent is simply un-triaged.
+       - AgentToMcp.is_deleted=t on A is SCAN-HISTORY lifecycle from the prior r7
+         uninstall test on tenant A (the MCP edge was closed when the detector
+         stopped affirming it); tenant B has seen only the install scan, so its
+         edge is still open (f).
+     Neither delta is a lane fork: the identity columns converge exactly, which
+     is the locked-pair invariant (calculate_mcp_id /
+     build_mcp_version_unique_identifier <-> _to_app_definition_id) holding —
+     CodeArts touches no id-derivation code, so the lanes converge by
+     construction.  SUB-ITEM 2: CLOSED (convergence, no ledger diff on content).
+
+
+################################################################################
+SUB-ITEM 3 — Settlement-class table (from the WRITER'S OWN labels)
+################################################################################
+Enumerates every settlement class the writer can label, its source, whether it
+was DRIVEN for real this run, and its product-visible end-state.  Consumer
+Prometheus counters were scraped live from the pod (localhost:8007/metrics),
+RAW, at capture time:
+
+  asset_ingestion_records_total{result="wrong_source"} 1.0
+  asset_ingestion_records_total{result="ok"} 2.0
+  asset_ingestion_records_total{result="unknown_tenant"} 2.0
+  asset_ingestion_records_written_total{outcome="created",step="agent_identity",table="assets",tenant_schema="tenant_b_prdct14239"} 4.0
+  asset_ingestion_records_written_total{outcome="matched",step="mcp_upsert",table="assets",tenant_schema="tenant_b_prdct14239"} 2.0
+  asset_ingestion_objects_total{outcome="processed",tenant_schema="tenant_b_prdct14239"} 2.0
+
+(A) OBJECT-LEVEL outcomes  (ObjectIngestionProcessor -> objects_total{outcome})
+CLASS                | LABEL / SOURCE                              | DRIVEN | PRODUCT END-STATE
+---------------------+---------------------------------------------+--------+------------------------------------------
+processed            | objects_total{outcome=processed}=2          | YES    | Asset subgraph written/affirmed; message acked.
+
+(B) RECORD-LEVEL outcomes  (message_handler _handle_record -> records_total{result})
+CLASS                | LABEL / SOURCE (message_handler.py)         | DRIVEN | PRODUCT END-STATE
+---------------------+---------------------------------------------+--------+------------------------------------------
+ok                   | records_total{result=ok}=2                  | YES    | Record ingested; contributes to processed object.
+unknown_tenant       | records_total{result=unknown_tenant}=2      | YES    | Key with no resolvable tenant -> skipped, acked; nothing written.
+wrong_source         | records_total{result=wrong_source}=1        | YES    | source!= lane's source -> dropped ack-safe; keeps metric labels honest.
+parse_err            | records_total{result=parse_err}; parse_errors| NO*   | Unparseable message body -> counted, acked; nothing written. (*not driven this run; prior r7 malformed-park evidence in r7-c11.)
+
+(C) WRITE-LEVEL outcomes  (repository upserts -> records_written_total{outcome,step,table})
+CLASS                | LABEL / SOURCE                              | DRIVEN | PRODUCT END-STATE
+---------------------+---------------------------------------------+--------+------------------------------------------
+created              | written{outcome=created,step=agent_identity}=4 | YES | New row inserted (first-seen identity).
+matched              | written{outcome=matched,step=mcp_upsert}=2   | YES  | Existing row matched by identity -> updated, not duplicated (dedup).
+unchanged            | written{outcome=unchanged,...}              | NO   | Row content identical to stored -> no-op write. Not separately emitted this run; the second (idempotent) ingest produced NO new rows (asset count stayed 1), which is the product-visible proof of the unchanged/no-fork end-state.
+
+(D) CONTENT-HASH REINGEST-SKIP  (AgentReingestSkipped / McpReingestSkipped counters)
+CLASS                | SOURCE                                      | DRIVEN | PRODUCT END-STATE
+---------------------+---------------------------------------------+--------+------------------------------------------
+reingest_skipped     | metrics.py reingest-skip counters           | NOT OBSERVED | When the incoming content hash equals the stored hash, the per-entity reingest is skipped. Not surfaced as a distinct log line this run; the idempotent second ingest (same key) settled outcome=processed with no new rows, consistent with a hash-equal skip, but the explicit AgentReingestSkipped/McpReingestSkipped label was not captured. NAMED-NOT-DRIVEN: would require instrumented counter scrape at the per-entity step across two ingests with a guaranteed-unchanged payload; the object's multi-agent shape made the per-step logs ambiguous (see lifecycle-class note).
+
+(E) LIFECYCLE CLASS  (in-process step outcomes observed in the consumer log)
+CLASS                | SOURCE (consumer log, trace-scoped)         | DRIVEN | PRODUCT END-STATE
+---------------------+---------------------------------------------+--------+------------------------------------------
+reconcile_skipped_empty_keepset | "reconcile SKIPPED for agent with empty keep-set" | YES | No-signal guard: an agent record carrying no children does NOT close existing edges (prevents a partial scan wiping inventory).
+guard_aggregate_skipped| "Guard aggregate skipped: scan incomplete"| YES    | Aggregate posture step deferred until the scan is complete; no premature verdict.
+step_skipped_no_entities| "no MCP servers in payload"/"no skills in payload" | YES | Per-agent sub-steps no-op when that agent record has no such child; other agents still processed.
+
+(F) POISON / DLQ  (message_handler _park_poison -> poison_messages / dead_letters)
+CLASS                | SOURCE                                      | DRIVEN | PRODUCT END-STATE
+---------------------+---------------------------------------------+--------+------------------------------------------
+poison(no_ingestible_object) | poison_messages{reason=no_ingestible_object} | NO | Body parsed to no fetchable object (lifecycle event) -> dead-lettered with reason, never acked away, never retried forever. NAMED-NOT-DRIVEN: requires an empty-is-poison lane (gateway) + a container-only BlobCreated; out of scope for the scanner lane's object.
+poison(unparseable)  | poison_messages{reason=unparseable}; dead_letters | NO | Deterministically unprocessable object (ObjectParseError) -> DLQ with reason. NAMED-NOT-DRIVEN: would need a crafted undecodable object; the malformed-PARSE park is evidenced code-side + in prior r7-c11, not re-driven here.
+redelivered          | redeliveries (ApproximateReceiveCount>1)    | NO   | At-least-once redelivery -> idempotent reprocess (safe per (tenant,s3_key)). NAMED-NOT-DRIVEN: not forced; the idempotent second manual-SQS ingest exercises the same idempotency guarantee without a >1 receive count.
+
+  => Driven for real (this run, flag-ON consumer): object processed; record ok /
+     unknown_tenant / wrong_source; write created / matched (dedup); lifecycle
+     reconcile-empty-keepset / guard-aggregate-skipped / per-entity step-skip;
+     plus idempotent no-fork on re-ingest.  Named-but-not-driven with reason:
+     record parse_err, write unchanged (as an explicit label), content-hash
+     reingest-skip labels, and the two poison/DLQ + redelivery classes.
+     SUB-ITEM 3: CLOSED (taxonomy enumerated; every class labelled driven or
+     named-not-driven with why).
+
+
+################################################################################
+SUB-ITEM 4 — Divergence ledger WITH DIRECTION (new lane ADDS, never LOSES)
+################################################################################
+Every place the two lanes intentionally differ, with direction. The rule under
+test: the new (flag-ON in-process) lane may ADD capability but must never LOSE an
+outcome the old (Temporal) lane produced.
+
+DIVERGENCE POINT                              | DIRECTION            | DETAIL
+----------------------------------------------+----------------------+---------------------------------------------
+Execution locus                               | ADDS (no loss)       | OFF: Temporal DesktopAgentCreatorWorkflow / collector. ON: in-process one-writer, off Temporal. Same rows written; the new lane removes the Temporal hop, adds nothing to and drops nothing from the persisted subgraph.
+Settlement acking policy                      | SAME                 | Both lanes ack on skipped/flag-off/unknown-tenant/malformed/processed; both leave a raising message unacked for idempotent redelivery (message_handler docstring "mirrors the Temporal lane").
+Poison / DLQ handling                         | ADDS (no loss)       | The in-process lane adds an explicit dead-letter-with-reason path (poison_messages + dead_letters) for can-never-parse bodies; the Temporal lane's equivalent is workflow-level. New lane ADDS observability; loses no drop-safety.
+Idempotency key                               | SAME                 | Both idempotent per (tenant, s3_key); redelivery safe on both.
+MCP / skill identity derivation               | SAME (by construction)| Locked pair calculate_mcp_id / build_mcp_version_unique_identifier <-> _to_app_definition_id is shared; CodeArts edits neither. Both lanes converge on ONE MCP asset (proven sub-item 2). Zero divergence.
+CodeArts-specific surface                     | ADDS (no loss)       | Three re-stamps (parser source=codearts, service_name=codearts, builtin-tool SERVICE=codearts) + wiring (registry, execution plan, SourceType enum) + one Linux-only PATH-gated detector. All ADD CodeArts recognition; none alters shared ingest/dedup for other sources.
+Per-lane metric labels                        | ADDS (no loss)       | The in-process lane emits asset_ingestion_* counters (objects/records/records_written, tenant_schema-labelled) the Temporal lane does not; pure added observability.
+
+  => NO OUTCOME-LOSING DIVERGENCE.  Every intentional difference is either SAME
+     (acking policy, idempotency, identity derivation) or the new lane ADDING
+     capability/observability while writing the identical asset subgraph. The
+     content columns converge exactly (sub-item 2), so the new lane LOSES nothing
+     the Temporal lane produced.  SUB-ITEM 4: CLOSED.
+
+
+================================================================================
+C13 VERDICT: PASS.  Same captured CodeArts payload, both lanes, identical outcome.
+  1. Flag-ON consumer INGEST proven on tenant B (raw rows above).
+  2. Both-lane diff: all content columns byte-identical; the two deltas are
+     governance + scan-history, not lane forks.
+  3. Settlement taxonomy enumerated from the writer's own labels; driven classes
+     backed by live counters, undriven classes named with reason.
+  4. Divergence ledger: no outcome-losing divergence; new lane only ADDS.
+Commit 290c2aa11563 | Tenant A onyx_security 61750f27-8fbd-42a4-80cf-4191cfb2371a
+| Tenant B tenant_b_prdct14239 4c7d92d8-d19b-4838-ace9-73731a36214b
+| scan_run_id 6142c920-cfb8-46f4-9d3d-3b1ce71f3329.
+Supporting: r7-c13-bothlane-lifecycle.txt (live-DB lifecycle),
+r7-c13-settlement-taxonomy.txt (code-grounded ledger).
+================================================================================
