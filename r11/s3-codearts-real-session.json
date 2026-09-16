@@ -1,0 +1,479 @@
+{
+  "info": {
+    "id": "ses_f53dbb752ffewn254YVqv2osac",
+    "slug": "glowing-island",
+    "projectID": "global",
+    "directory": "/home/coder",
+    "title": "Runtime guard probe check",
+    "version": "26.9.4",
+    "summary": {
+      "additions": 0,
+      "deletions": 0,
+      "files": 0
+    },
+    "time": {
+      "created": 1789594454189,
+      "updated": 1789594567692
+    }
+  },
+  "messages": [
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1789594454266
+        },
+        "agent": "build",
+        "model": {
+          "providerID": "huaweicloud-maas",
+          "modelID": "GLM-5.1"
+        },
+        "summary": {
+          "diffs": []
+        },
+        "id": "msg_0ac2448b5001EF3TMrpzGt5K4Y",
+        "sessionID": "ses_f53dbb752ffewn254YVqv2osac"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "Use your bash tool to run exactly this one shell command and nothing else: echo onyx-codearts-runtime-guard-probe",
+          "metadata": {
+            "isUserInput": true
+          },
+          "id": "prt_0ac2448b6001P4jEZsgqLlXslu",
+          "sessionID": "ses_f53dbb752ffewn254YVqv2osac",
+          "messageID": "msg_0ac2448b5001EF3TMrpzGt5K4Y"
+        },
+        {
+          "type": "text",
+          "text": "<system-reminder>IMPORTANT: You must reply in English only, regardless of the language used in the user's question.</system-reminder>",
+          "synthetic": true,
+          "id": "prt_0ac2448b6001P4jEZsgqLlXslu_codeagent",
+          "sessionID": "ses_f53dbb752ffewn254YVqv2osac",
+          "messageID": "msg_0ac2448b5001EF3TMrpzGt5K4Y"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_0ac2448b5001EF3TMrpzGt5K4Y",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "path": {
+          "cwd": "/home/coder",
+          "root": "/"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 20923,
+          "input": 20500,
+          "output": 27,
+          "reasoning": 12,
+          "cache": {
+            "write": 0,
+            "read": 384
+          },
+          "context": {
+            "tools": 0,
+            "mcp": 0,
+            "messages": 105,
+            "skills": 0,
+            "system_prompts": 20818
+          }
+        },
+        "modelID": "GLM-5.1",
+        "providerID": "huaweicloud-maas",
+        "time": {
+          "created": 1789594454657,
+          "completed": 1789594462334
+        },
+        "finish": "tool-calls",
+        "id": "msg_0ac244a81001HcW6ku1vmlTKn1",
+        "sessionID": "ses_f53dbb752ffewn254YVqv2osac"
+      },
+      "parts": [
+        {
+          "type": "step-start",
+          "id": "prt_0ac24640b001jUZ7rrtwk4VmLF",
+          "sessionID": "ses_f53dbb752ffewn254YVqv2osac",
+          "messageID": "msg_0ac244a81001HcW6ku1vmlTKn1"
+        },
+        {
+          "type": "reasoning",
+          "text": "The user wants me to run a specific shell command.",
+          "time": {
+            "start": 1789594461197,
+            "end": 1789594461533
+          },
+          "id": "prt_0ac24640d001707dvZJlbmPsOK",
+          "sessionID": "ses_f53dbb752ffewn254YVqv2osac",
+          "messageID": "msg_0ac244a81001HcW6ku1vmlTKn1"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_c9d4c73c714d4bbb96146355",
+          "state": {
+            "status": "error",
+            "input": {
+              "command": "echo onyx-codearts-runtime-guard-probe",
+              "description": "Echo the probe string"
+            },
+            "error": "Blocked by Onyx AI Guard\nYour request was blocked by Onyx AI Guard.\nViolated rules: Block CodeArts shell command\nOnyx Violation ID: 421bffbbac0c4a4fbfe65c0ca20c9bae",
+            "time": {
+              "start": 1789594462179,
+              "end": 1789594462292
+            }
+          },
+          "id": "prt_0ac246560001n9NmWkGO495nfc",
+          "sessionID": "ses_f53dbb752ffewn254YVqv2osac",
+          "messageID": "msg_0ac244a81001HcW6ku1vmlTKn1"
+        },
+        {
+          "reason": "tool-calls",
+          "type": "step-finish",
+          "tokens": {
+            "total": 20923,
+            "input": 20500,
+            "output": 27,
+            "reasoning": 12,
+            "cache": {
+              "write": 0,
+              "read": 384
+            },
+            "context": {
+              "tools": 0,
+              "mcp": 0,
+              "messages": 105,
+              "skills": 0,
+              "system_prompts": 20818
+            }
+          },
+          "cost": 0,
+          "id": "prt_0ac246861001cKe1XRG5T6dwpL",
+          "sessionID": "ses_f53dbb752ffewn254YVqv2osac",
+          "messageID": "msg_0ac244a81001HcW6ku1vmlTKn1"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_0ac2448b5001EF3TMrpzGt5K4Y",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "path": {
+          "cwd": "/home/coder",
+          "root": "/"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 21013,
+          "input": 119,
+          "output": 29,
+          "reasoning": 1,
+          "cache": {
+            "write": 0,
+            "read": 20864
+          },
+          "context": {
+            "tools": 60,
+            "mcp": 0,
+            "messages": 192,
+            "skills": 0,
+            "system_prompts": 20761
+          }
+        },
+        "modelID": "GLM-5.1",
+        "providerID": "huaweicloud-maas",
+        "time": {
+          "created": 1789594462342,
+          "completed": 1789594469376
+        },
+        "finish": "stop",
+        "id": "msg_0ac246886001jzS8Jwe4rN26yt",
+        "sessionID": "ses_f53dbb752ffewn254YVqv2osac"
+      },
+      "parts": [
+        {
+          "type": "step-start",
+          "id": "prt_0ac2480030013ullHyrhqsJ2QJ",
+          "sessionID": "ses_f53dbb752ffewn254YVqv2osac",
+          "messageID": "msg_0ac246886001jzS8Jwe4rN26yt"
+        },
+        {
+          "type": "text",
+          "text": "The command was blocked by the Onyx AI Guard runtime guard, which prevented execution with the violation: \"Block CodeArts shell command\".",
+          "time": {
+            "start": 1789594469352,
+            "end": 1789594469352
+          },
+          "id": "prt_0ac248006001a5rKsVdeCKgEte",
+          "sessionID": "ses_f53dbb752ffewn254YVqv2osac",
+          "messageID": "msg_0ac246886001jzS8Jwe4rN26yt"
+        },
+        {
+          "reason": "stop",
+          "type": "step-finish",
+          "tokens": {
+            "total": 21013,
+            "input": 119,
+            "output": 29,
+            "reasoning": 1,
+            "cache": {
+              "write": 0,
+              "read": 20864
+            },
+            "context": {
+              "tools": 60,
+              "mcp": 0,
+              "messages": 192,
+              "skills": 0,
+              "system_prompts": 20761
+            }
+          },
+          "cost": 0,
+          "id": "prt_0ac2483ed001SplXs7YyBTLHAL",
+          "sessionID": "ses_f53dbb752ffewn254YVqv2osac",
+          "messageID": "msg_0ac246886001jzS8Jwe4rN26yt"
+        }
+      ]
+    },
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1789594555236
+        },
+        "agent": "build",
+        "model": {
+          "providerID": "huaweicloud-maas",
+          "modelID": "GLM-5.1"
+        },
+        "summary": {
+          "diffs": []
+        },
+        "id": "msg_0ac25d35d001CYszFnq2VXtXhN",
+        "sessionID": "ses_f53dbb752ffewn254YVqv2osac"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "Now run exactly this one shell command and nothing else: echo hello-allow-benign-onyx",
+          "metadata": {
+            "isUserInput": true
+          },
+          "id": "prt_0ac25d35d002QI13KPt7qzKmxP",
+          "sessionID": "ses_f53dbb752ffewn254YVqv2osac",
+          "messageID": "msg_0ac25d35d001CYszFnq2VXtXhN"
+        },
+        {
+          "type": "text",
+          "text": "<system-reminder>IMPORTANT: You must reply in English only, regardless of the language used in the user's question.</system-reminder>",
+          "synthetic": true,
+          "id": "prt_0ac25d35d002QI13KPt7qzKmxP_codeagent",
+          "sessionID": "ses_f53dbb752ffewn254YVqv2osac",
+          "messageID": "msg_0ac25d35d001CYszFnq2VXtXhN"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_0ac25d35d001CYszFnq2VXtXhN",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "path": {
+          "cwd": "/home/coder",
+          "root": "/"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 21106,
+          "input": 202,
+          "output": 28,
+          "reasoning": 12,
+          "cache": {
+            "write": 0,
+            "read": 20864
+          },
+          "context": {
+            "tools": 45,
+            "mcp": 0,
+            "messages": 322,
+            "skills": 0,
+            "system_prompts": 20739
+          }
+        },
+        "modelID": "GLM-5.1",
+        "providerID": "huaweicloud-maas",
+        "time": {
+          "created": 1789594555331,
+          "completed": 1789594562809
+        },
+        "finish": "tool-calls",
+        "id": "msg_0ac25d3c3001SGkxJ1kUvNqRas",
+        "sessionID": "ses_f53dbb752ffewn254YVqv2osac"
+      },
+      "parts": [
+        {
+          "type": "step-start",
+          "id": "prt_0ac25eae5001SEgNkBRmqGUUfS",
+          "sessionID": "ses_f53dbb752ffewn254YVqv2osac",
+          "messageID": "msg_0ac25d3c3001SGkxJ1kUvNqRas"
+        },
+        {
+          "type": "reasoning",
+          "text": "The user wants me to run another specific shell command.",
+          "time": {
+            "start": 1789594561255,
+            "end": 1789594561580
+          },
+          "id": "prt_0ac25eae7001s7al3KLUpu0Ep5",
+          "sessionID": "ses_f53dbb752ffewn254YVqv2osac",
+          "messageID": "msg_0ac25d3c3001SGkxJ1kUvNqRas"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call_a803b0b29f6f488c9b079803",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "echo hello-allow-benign-onyx",
+              "description": "Echo the benign string"
+            },
+            "output": "hello-allow-benign-onyx\n",
+            "metadata": {
+              "executeMode": "sandbox_mode",
+              "output": "hello-allow-benign-onyx\n",
+              "exit": 0,
+              "description": "Echo the benign string",
+              "sandbox": true,
+              "networkPolicy": "deny_all",
+              "executionTime": 0.021
+            },
+            "title": "Echo the benign string (Sandbox)",
+            "time": {
+              "start": 1789594562193,
+              "end": 1789594562787
+            }
+          },
+          "id": "prt_0ac25ec2e001ENe9z1MPPvVmKl",
+          "sessionID": "ses_f53dbb752ffewn254YVqv2osac",
+          "messageID": "msg_0ac25d3c3001SGkxJ1kUvNqRas"
+        },
+        {
+          "reason": "tool-calls",
+          "type": "step-finish",
+          "tokens": {
+            "total": 21106,
+            "input": 202,
+            "output": 28,
+            "reasoning": 12,
+            "cache": {
+              "write": 0,
+              "read": 20864
+            },
+            "context": {
+              "tools": 45,
+              "mcp": 0,
+              "messages": 322,
+              "skills": 0,
+              "system_prompts": 20739
+            }
+          },
+          "cost": 0,
+          "id": "prt_0ac25f0e6001pdYvwsRDEumuGW",
+          "sessionID": "ses_f53dbb752ffewn254YVqv2osac",
+          "messageID": "msg_0ac25d3c3001SGkxJ1kUvNqRas"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_0ac25d35d001CYszFnq2VXtXhN",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "path": {
+          "cwd": "/home/coder",
+          "root": "/"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 21133,
+          "input": 21120,
+          "output": 12,
+          "reasoning": 1,
+          "cache": {
+            "write": 0,
+            "read": 0
+          },
+          "context": {
+            "tools": 110,
+            "mcp": 0,
+            "messages": 350,
+            "skills": 0,
+            "system_prompts": 20673
+          }
+        },
+        "modelID": "GLM-5.1",
+        "providerID": "huaweicloud-maas",
+        "time": {
+          "created": 1789594562814,
+          "completed": 1789594567696
+        },
+        "finish": "stop",
+        "id": "msg_0ac25f0fe001Gu575AnOIWpp8W",
+        "sessionID": "ses_f53dbb752ffewn254YVqv2osac"
+      },
+      "parts": [
+        {
+          "type": "step-start",
+          "id": "prt_0ac2602860014rDz24vgQ570zD",
+          "sessionID": "ses_f53dbb752ffewn254YVqv2osac",
+          "messageID": "msg_0ac25f0fe001Gu575AnOIWpp8W"
+        },
+        {
+          "type": "text",
+          "text": "`hello-allow-benign-onyx`",
+          "time": {
+            "start": 1789594567682,
+            "end": 1789594567682
+          },
+          "id": "prt_0ac260287001CHQNEkTdVlJ65r",
+          "sessionID": "ses_f53dbb752ffewn254YVqv2osac",
+          "messageID": "msg_0ac25f0fe001Gu575AnOIWpp8W"
+        },
+        {
+          "reason": "stop",
+          "type": "step-finish",
+          "tokens": {
+            "total": 21133,
+            "input": 21120,
+            "output": 12,
+            "reasoning": 1,
+            "cache": {
+              "write": 0,
+              "read": 0
+            },
+            "context": {
+              "tools": 110,
+              "mcp": 0,
+              "messages": 350,
+              "skills": 0,
+              "system_prompts": 20673
+            }
+          },
+          "cost": 0,
+          "id": "prt_0ac260405001GrNYZXxsR8Atmk",
+          "sessionID": "ses_f53dbb752ffewn254YVqv2osac",
+          "messageID": "msg_0ac25f0fe001Gu575AnOIWpp8W"
+        }
+      ]
+    }
+  ]
+}

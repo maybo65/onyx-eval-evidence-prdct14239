@@ -1,0 +1,146 @@
+================================================================================
+S3 + C16 — REAL Huawei CodeArts coding agent driven end-to-end through the Onyx
+          AI Guard: authenticated session, plugin loaded, allow -> deny -> allow,
+          real guard verdicts, real TUI block toast + tool-deny render captured.
+================================================================================
+Commit under test:  290c2aa11563d0c5325995c2b77236065be6cb36
+Captured (UTC):     2026-09-16T21:26Z - 21:36Z
+Host:               ip-10-10-6-235 (real Linux dev box, this workstation)
+Agent:              Huawei CodeArts CLI  v26.9.4  (/home/coder/.local/bin/codearts)
+Config home:        /home/coder/.codeartsdoer
+Plugin under test:  /home/coder/.codeartsdoer/plugin/onyx-guard.ts  (UNMODIFIED,
+                    md5 37fff378d2a27d214ef58ae52dc50964, 483 lines)
+Bundled scanner:    /home/coder/.codeartsdoer/plugin/onyx/onyx-scanner
+                    (branch build of THIS PR's scanner/ source; md5 535dab241fb3d17e6...)
+Guard:              REAL Onyx AI Guard, Kong front door http://localhost:8080,
+                    ai_firewall_policies policy 22 ENABLED, rule "Block CodeArts
+                    shell command" (rule_type tool_execution, action Block, regex
+                    `echo\s+.*onyx-codearts-runtime-guard-probe` on tool.inputs.command).
+
+--------------------------------------------------------------------------------
+CREDENTIALS  (real Huawei Cloud, MASKED here; live values in the box-only file
+             /home/coder/factory-artifacts/evidence/huawei/aksk.env, never published)
+--------------------------------------------------------------------------------
+CODEARTS_CLI_AK = HPUAEHTW************  (masked)
+CODEARTS_CLI_SK = 7UjGPZ5l****************************  (masked)
+Region:           ap-southeast-1
+IAM auth result:  getUserInfo SUCCESS  hasUserInfo=true
+                  user_id=01a09a2bd3a5715ba85d91f0381a9e58
+                  domain_id=01a09a2bd3a47767b15f2d4a0da7aeb8
+Model used:       huaweicloud-maas/GLM-5.1  (real Huawei MaaS inference)
+
+================================================================================
+HOP MAP  — every hop is now REAL (hop 1 was the round-9/10 IAM auth wall; a real
+           AK/SK now passes it, so the real agent loads the plugin itself)
+================================================================================
+Hop 1  agent(CodeArts) -> plugin      : REAL. Real Huawei IAM getUserInfo succeeds;
+       the CLI then loads the external plugin:
+         service=plugin "loading plugin" path=file:///home/coder/.codeartsdoer/plugin/onyx-guard.ts
+Hop 2  plugin -> scanner subprocess   : REAL. onyx-guard's execScanner spawns the
+       bundled onyx-scanner (hooks --source=codearts).
+Hop 3  scanner -> Onyx AI Guard       : REAL HTTP evaluate against the running guard.
+Hop 4  verdict -> rendered surface     : REAL. The agent renders the block in its TUI.
+
+Nothing is substituted. (Round 10's C16 file used a node-driven host to stand in for
+hop 1; that substitution is now RETIRED — the real agent drives all four hops below.)
+
+================================================================================
+REAL SESSIONS (this round)
+================================================================================
+  ses_f53e2d5c0ffeQAb5jglZGu3nT3  — headless `codearts run --auto`, ALLOW (benign)
+  ses_f53e1d068ffeICs7BbYZBCfDqq  — headless `codearts run --auto`, DENY (probe)
+  ses_f53dbb752ffewn254YVqv2osac  — interactive TUI, DENY then ALLOW in one session
+                                    (title "Runtime guard probe check"); exported to
+                                    s3-codearts-real-session.json (13,957 bytes; no
+                                    secrets — grep for AK/SK/authorization = empty)
+
+================================================================================
+(A) SCANNER VERDICTS per real session  (~/.onyx/mcp-scanner/logs/scanner.log)
+================================================================================
+ses_f53e1d068ffeICs7BbYZBCfDqq (headless DENY):
+    hook=llm_input  verdict=allow
+    hook=llm_output verdict=allow
+    hook=tool       verdict=block      <-- the probe command blocked
+  Evaluate response {"action": "block"}
+  Prompt blocked {"block_reason": ["Your request was blocked by Onyx AI Guard.\n
+    Violated rules: Block CodeArts shell command\n\n[ONYX_VIOLATION_ID:588a84935d544a0ab288de2111f76768]"]}
+  hook_invocation {"hook_source":"codearts","hook_type":"tool","session_id":
+    "ses_f53e1d068ffeICs7BbYZBCfDqq","evaluate_action":"block", ... "exit_code":0}
+
+ses_f53dbb752ffewn254YVqv2osac (interactive TUI, DENY then ALLOW):
+    hook=tool       verdict=block      <-- probe command blocked
+    hook=tool       verdict=allow      <-- benign command allowed
+    hook=post_tool  verdict=allow
+    hook=llm_input  verdict=allow  (x2)
+    hook=llm_output verdict=allow  (x2)
+  Evaluate response {"action": "block"}
+  Prompt blocked {"block_reason": ["Your request was blocked by Onyx AI Guard.\n
+    Violated rules: Block CodeArts shell command\n\n[ONYX_VIOLATION_ID:421bffbbac0c4a4fbfe65c0ca20c9bae]"]}
+
+  => In ONE real session the guard BLOCKS the probe (tool verdict=block) and ALLOWS
+     the benign command (tool verdict=allow) — the allow/deny distinction proven at
+     the scanner, driven by the real agent.
+
+================================================================================
+(B) DENY — the real agent's rendered block surfaces  (session ses_f53dbb752 /
+    headless ses_f53e1d06). Probe: bash { command: "echo onyx-codearts-runtime-guard-probe" }
+================================================================================
+(i) blockMessage() [onyx-guard.ts:149] — thrown to DENY the tool call. Captured from
+    the real agent's tool state (message.part.updated, state.status="error"):
+      command: "echo onyx-codearts-runtime-guard-probe"
+      error:   "Blocked by Onyx AI Guard
+                Your request was blocked by Onyx AI Guard.
+                Violated rules: Block CodeArts shell command
+                Onyx Violation ID: 588a84935d544a0ab288de2111f76768"
+    Rendered to the terminal by the agent as:
+      Error: Blocked by Onyx AI Guard
+      Your request was blocked by Onyx AI Guard.
+      Violated rules: Block CodeArts shell command
+      Onyx Violation ID: 588a84935d544a0ab288de2111f76768
+
+(ii) showBlockToast() [onyx-guard.ts:163] — the red TUI toast. Captured from the real
+     agent's own event bus (service=bus-publish), NOT a recorder stand-in:
+       {"type":"tui.toast.show","properties":{
+          "title":"Onyx AI Guard",
+          "message":"Blocked by Onyx AI Guard — Violation ID: 588a84935d544a0ab288de2111f76768",
+          "variant":"error","duration":10000}}
+     And rendered visually in the real TUI (see PNG below), with the round's TUI
+     violation id 421bffbbac0c4a4fbfe65c0ca20c9bae.
+
+(iii) The agent's own natural-language relay of the block to the user (real model output):
+     "The command was blocked by the Onyx AI Guard runtime guard, which prevented
+      execution with the violation: \"Block CodeArts shell command\"."
+
+================================================================================
+(C) ALLOW — the real agent runs a benign command unimpeded (same TUI session, and
+    headless ses_f53e2d5c). Command: echo hello-allow-benign-onyx
+================================================================================
+  $ echo hello-allow-benign-onyx
+  hello-allow-benign-onyx            <-- executed; scanner tool verdict=allow, post_tool=allow
+
+================================================================================
+(D) VISUAL EVIDENCE (real TUI frames)
+================================================================================
+  evidence/c16-real-tui-deny.png   — the real CodeArts TUI at the DENY: red toast
+     (top-right, title "Onyx AI Guard") + the red in-conversation tool-deny block
+     with rule "Block CodeArts shell command" + Violation ID 421bffbbac0c4a4fbfe65c0ca20c9bae.
+  evidence/c16-real-tui-allow.png  — the same live session: probe BLOCKED (red) then
+     benign echo ALLOWED (output "hello-allow-benign-onyx" printed).
+  evidence/s3-codearts-real-session.json — raw exported transcript of the TUI session.
+
+  Render method (honest disclosure): the two PNGs are faithful ansi2html renders of the
+  REAL `tmux capture-pane -e` frames of the live CodeArts TUI (session ses_f53dbb752,
+  GLM-5.1 huaweicloud-maas). They are a transcription of the actual terminal bytes the
+  real agent produced to an image — NOT a hand-drawn/generated mockup. The raw ANSI
+  frames are retained at /tmp/tui-frames/ (hit_6_*.ansi = deny, allowhit_5_*.ansi = allow).
+
+================================================================================
+WHAT THIS CLOSES
+================================================================================
+- S3 real transcript: the real CodeArts agent authenticates against Huawei IAM and
+  runs real GLM-5.1 sessions on this box — hop-1 auth wall is CLOSED, not a caveat.
+- C16 real TUI captures: the tool-deny Error AND the red block toast are captured
+  from the ACTUAL agent (bus events + rendered TUI), superseding the round-10
+  node-driver renders for surfaces (i) and (ii).
+- The allow->deny->allow behaviour is proven end-to-end through the real agent with
+  real guard verdicts and real Huawei MaaS inference.
