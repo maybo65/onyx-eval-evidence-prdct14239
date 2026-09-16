@@ -1,0 +1,90 @@
+================================================================================
+S3 — REAL scanner 'hooks' spawn -> REAL Onyx AI Guard -> ALLOW + DENY verdict
+================================================================================
+Commit:            290c2aa11563d0c5325995c2b77236065be6cb36 (fix(scanner): sanction CodeArts MCP tool calls)
+Captured (UTC):    2026-09-16T20:25:23Z
+Scanner binary:    /home/coder/.codeartsdoer/plugin/onyx/onyx-scanner (real installed copy)
+Exact hop driven:  onyx-scanner hooks --source=codearts --type=tool --api-key <KEY> --endpoint-url <URL> --verbose
+Endpoint URL used: http://localhost:8080   (Kong front door, from onyx-config.json endpoint-url)
+Guard eval route:  POST /guard/evaluate/v1/<encoded-api-key>/codearts/<encoded-payload>
+API key (redact):  MCPGat... (first 6 chars; real provisioned key from onyx-config.json)
+Enabled policy:    ai_firewall_policies id=22 (is_enabled=t, is_deleted=f) rule "Block CodeArts shell command"
+Asset:             id 230 = "CodeArts (ca-home, coder, home, r7-ca-home)"  (endpoint_codearts)
+
+NOTHING is mocked: the onyx-scanner binary, the Kong front door, the AI Guard
+policy evaluation, and the Postgres persistence are all the real running stack.
+This is the EXACT subprocess hop the CodeArts onyx-guard.ts plugin spawns.
+
+################################################################################
+# CASE A — BENIGN tool call -> ALLOW
+################################################################################
+
+--- stdin (full payload piped to scanner) ---
+{"opencode_version": "0.4.2", "session_id": "ses_s3ALLOW_20260916T202345Z", "run_id": "run_s3ALLOW", "tool_call_id": "tc_s3ALLOW", "mcp_call_id": null, "tool_name": "bash", "tool_params": {"command": "ls -la /home/coder/project", "description": "s3 benign capture"}, "directory": "/home/coder/project", "worktree": "/home/coder/project"}
+
+--- stdout (verbatim) ---
+{"action":"allow"}
+
+--- stderr (verbatim) ---
+
+<empty — scanner writes verbose logs to ~/.onyx/mcp-scanner/logs/scanner.log>
+
+--- verbose log lines (HTTP call + verdict) ---
+2026-09-16T20:23:46  DEBUG Hooks command triggered, source=codearts, hook-type=tool
+2026-09-16T20:23:46  DEBUG Sending evaluation request to: http://localhost:8080
+2026-09-16T20:23:46  DEBUG Evaluate response {"action": "allow"}
+2026-09-16T20:23:46  INFO  hook_invocation {evaluate_action: allow, is_mcp_tool: false, hook_source: codearts, exit_code: 0}
+
+################################################################################
+# CASE B — VIOLATING tool call -> DENY (block)
+#   violating content reused from earlier C7 captures: bash command
+#   "echo onyx-codearts-runtime-guard-probe" blocked by policy 22
+################################################################################
+
+--- stdin (full payload piped to scanner) ---
+{"opencode_version": "0.4.2", "session_id": "ses_s3DENY_20260916T202404Z", "run_id": "run_s3DENY", "tool_call_id": "tc_s3DENY", "mcp_call_id": null, "tool_name": "bash", "tool_params": {"command": "echo onyx-codearts-runtime-guard-probe", "description": "s3 violating capture"}, "directory": "/home/coder/project", "worktree": "/home/coder/project"}
+
+--- stdout (verbatim) ---
+{"action":"block","block_reason":["Your request was blocked by Onyx AI Guard.\nViolated rules: Block CodeArts shell command\n\n[ONYX_VIOLATION_ID:8bd37fa762f74848b9c4a228f0b8bdfe]"],"violated_rules":["Block CodeArts shell command"]}
+
+--- stderr (verbatim) ---
+
+<empty — scanner writes verbose logs to ~/.onyx/mcp-scanner/logs/scanner.log>
+
+--- verbose log lines (HTTP call + verdict), correlated by session id ---
+2026-09-16T20:24:04.761452766Z	DEBUG	Sending evaluation request to: http://localhost:8080
+2026-09-16T20:24:04.792760968Z	DEBUG	Evaluate response	{"action": "block"}
+2026-09-16T20:24:04.792820158Z	INFO	Prompt blocked	{"block_reason": ["Your request was blocked by Onyx AI Guard.\nViolated rules: Block CodeArts shell command\n\n[ONYX_VIOLATION_ID:8bd37fa762f74848b9c4a228f0b8bdfe]"]}
+2026-09-16T20:24:04.792877952Z	INFO	hook_invocation	{"event": "hook_invocation", "platform": "linux", "caller": "scanner_hooks_cmd", "hook_source": "codearts", "hook_type": "tool", "session_id": "ses_s3DENY_20260916T202404Z", "is_mcp_tool": false, "mcp_guard_hooks": true, "outcome": "non_mcp", "sanction_action": "skipped", "evaluate_action": "block", "fail_open_reason": "", "api_key_source": "flag", "process_walk_outcome": "resolved", "process_walk_pid": 2485165, "hook_owner_outcome": "", "exit_code": 0, "elapsed_ms": 32, "sample_rate": 1}
+
+Real guard verdict (stdout): action=block
+  block_reason: "Your request was blocked by Onyx AI Guard.
+                 Violated rules: Block CodeArts shell command
+                 [ONYX_VIOLATION_ID:8bd37fa762f74848b9c4a228f0b8bdfe]"
+  violated_rules: ["Block CodeArts shell command"]
+
+################################################################################
+# DB READBACK — the DENY persisted a violation attributed to the CodeArts asset
+#   Queried immediately after the block via /tmp/r7-psql.sh (schema onyx_security)
+################################################################################
+
+-- violation row (ai_firewall_alert_violated_rules JOIN ai_firewall_alerts) --
+           violation_id           | action |          rule_name           |      type      | direction | asset_id | policy_id | session_id | derived_action | severity | status |          created_at           
+----------------------------------+--------+------------------------------+----------------+-----------+----------+-----------+------------+----------------+----------+--------+-------------------------------
+ 8bd37fa762f74848b9c4a228f0b8bdfe | Block  | Block CodeArts shell command | tool_execution | output    |      230 |        22 |        359 | Block          |        6 | Open   | 2026-09-16 20:24:07.980513+00
+(1 row)
+
+-- session row proving source/attribution (usage_sessions id=359) --
+ id  |          external_id           | app_id
+-----+--------------------------------+--------
+ 359 | ses_s3DENY_20260916T202404Z    |    230   <- external_id == the session_id in the DENY stdin payload; app_id 230 == CodeArts asset
+(1 row)
+
+-- asset 230 identity (assets) --
+ id  |                    name                     
+-----+---------------------------------------------
+ 230 | CodeArts (ca-home, coder, home, r7-ca-home)
+
+CLOSED LOOP: the exact real-scanner DENY payload (session ses_s3DENY_20260916T202404Z)
+produced ONYX_VIOLATION_ID 8bd37fa762f74848b9c4a228f0b8bdfe, which persisted as a
+Block violation on the CodeArts asset (id 230) under policy 22. Source = codearts.

@@ -1,0 +1,106 @@
+C9 — RUNTIME_PROTECTION_SUPPORTED_APP_DEFINITION_IDS consumer states
+Commit: 290c2aa11563 ("fix(scanner): sanction CodeArts MCP tool calls")
+Captured (UTC): 2026-09-16T20:48Z
+Subject id under test: endpoint_codearts (CodeArts agent asset id=230, tenant onyx_security)
+
+METHOD
+  Real Frontegg SSO login (coder-agent@onyx.security via JumpCloud), one node
+  process per pass, headed Chromium under xvfb. UI is the Vite dev server (pnpm
+  dev --host, HMR) at localhost:8181.
+  AFTER  = endpoint_codearts PRESENT in the supported set (the PR state).
+  BEFORE = endpoint_codearts temporarily removed from the RUNNING ui pod's copy
+           of runtime-protection-support.generated.json (sed on the pod file
+           only), page reloaded via HMR, screenshot, then the pod file restored
+           from backup. The box git tree was never touched.
+  Verified after run: pod JSON codearts count = 1, line "endpoint_codearts"
+  present, no .c9bak leftover; `git status` shows only pre-existing untracked
+  .codeartsdoer/ (no tracked file modified).
+
+SHARED PREDICATE (frontend/app/src/lib/runtime-protection-support.ts)
+  RUNTIME_PROTECTION_SUPPORTED_APP_DEFINITION_IDS = Set(generated JSON list).
+  isRuntimeProtectionUnsupported(id) =
+      !!id && !SUPPORTED.has(id) && !isSwgGuardedApp(id)
+  isSwgGuardedApp(id) = id in {endpoint_microsoft_copilot, endpoint_m365_copilot}.
+  endpoint_codearts is NOT SWG-guarded, so its state is decided purely by set
+  membership: supported when present, unsupported when absent.
+
+------------------------------------------------------------------------------
+CONSUMER 1 — Desktop-agent GROUP overview AI-Guard banner
+  File:  frontend/app/src/routes/ai-assets/desktop-agents/group/-components/group-overview.tsx
+  Route: /ai-assets/desktop-agents/group/endpoint_codearts
+  Backend field read: appDefinitionId (the group's app_definition_id, "endpoint_codearts").
+    notSupported = isRuntimeProtectionUnsupported(appDefinitionId)
+                   || isRuntimeProtectionUnavailableForTenant(appDefinitionId, swgProxyKeyDisplay)
+    Passed to <AiGuardConnectBanner notSupported={notSupported} ...>.
+    The group response carries no aggregate is_guarded, so guarded-vs-unguarded
+    of the connect banner is unaffected by this flag — only supported vs not.
+  SUPPORTED branch (AFTER): notSupported=false -> AiGuardConnectBanner renders
+    the normal connect/configure/applied state. Screenshot shows the applied
+    state: "2 runtime policies assigned to this group".
+    -> c9-group-banner-after.png
+  NOT-SUPPORTED branch (BEFORE): notSupported=true -> banner renders the neutral
+    not-supported state: "Runtime protection is not currently supported for this
+    agent type." (shield-off icon, no Connect/Configure affordance).
+    -> c9-group-banner-before.png
+
+------------------------------------------------------------------------------
+CONSUMER 2 — Monitoring scanner scan-detail guard badge
+  Files: frontend/app/src/routes/monitoring/-components/scanner-table/guard-status-tooltips.tsx
+         frontend/app/src/routes/monitoring/-components/scanner-table/scan-detail-view.tsx (line ~359)
+  Route: /integrations/scanner -> device row -> scan row -> agent accordion.
+  Backend fields read: the scan-result agent object (CodingAgentInfoMinimal)
+    carries detector Name() and isGuarded ONLY (no app_definition_id). The badge
+    reconstructs the id as `endpoint_${agentName}` (mirrors backend
+    GenerateAgentAppDefID) and consults the same supported set.
+    scan-detail-view: <GuardedBadge isGuarded={agent.isGuarded ?? false}
+                                    agentName={agent.name} />  (null isGuarded -> false)
+    scannerGuardBadgeState(agentName, isGuarded):
+      if (isGuarded) return "guarded";                         // green, always wins
+      return isRuntimeProtectionUnsupported(`endpoint_${agentName}`)
+               ? "not-supported"                                // grey
+               : "unguarded";                                   // red
+  CodeArts observed isGuarded = false (0 skills guarded), so its branch is
+  decided by set membership:
+  SUPPORTED branch (AFTER): endpoint_codearts in set -> isRuntimeProtectionUnsupported=false
+    -> "unguarded" -> RED "Unguarded" badge. (Control: Claude-Code stays RED
+    "Unguarded" in both passes; only the CodeArts row changes.)
+    -> c9-scanner-badge-after.png
+  NOT-SUPPORTED branch (BEFORE): endpoint_codearts absent -> isRuntimeProtectionUnsupported=true
+    -> "not-supported" -> GREY "Not supported" badge.
+    -> c9-scanner-badge-before.png
+  GUARDED (green) state: not reachable for CodeArts (isGuarded is false in this
+    tenant; a guarded agent would short-circuit to green regardless of the set).
+    No c9-scanner-badge-guarded.png captured — genuinely no such data exists here.
+
+------------------------------------------------------------------------------
+CONSUMER 3 — AI-Guard policy scope picker (Asset "Name" value cell)
+  File:  frontend/app/src/components/policies/assignment/assignment-value-picker.tsx
+  Route: /ai-firewall/create (Scope selection; requires LD flag
+         multiPolicyAssignment=true, forced via dev localStorage
+         ld-flag-overrides). Condition: Entity=Asset, Field=Name, operator "in".
+  Backend field read: each inventory row's app_definition_id.
+    isProtectableScopeCandidate(asset) = !isRuntimeProtectionUnsupported(asset.app_definition_id)
+    AssetSelectorPicker -> searchFamilyAssets(..., { dropUnprotectable: true }):
+      data.filter(isProtectableScopeCandidate)   // client-side, an OR the flat AND filter can't express
+    So a CodeArts asset appears as a selectable option iff endpoint_codearts is
+    in the supported set.
+  SUPPORTED branch (AFTER): search "codearts" offers BOTH "Claude Code" and
+    "Codearts" — CodeArts is a protectable scope candidate.
+    -> c9-scope-picker-after.png
+  NOT-SUPPORTED branch (BEFORE): same search offers ONLY "Claude Code" — the
+    Codearts row is dropped by dropUnprotectable.
+    -> c9-scope-picker-before.png
+  EMPTY / no-results state (search term matches nothing, e.g. "zzzznomatch12345"):
+    MultiSelect renders "No results found." — independent of the supported set.
+    -> c9-scope-picker-empty.png
+
+------------------------------------------------------------------------------
+EVIDENCE FILES (/home/coder/factory-artifacts/evidence/)
+  c9-group-banner-after.png     supported     "2 runtime policies assigned to this group"
+  c9-group-banner-before.png    not-supported "Runtime protection is not currently supported..."
+  c9-scanner-badge-after.png    supported     CodeArts = RED "Unguarded"
+  c9-scanner-badge-before.png   not-supported CodeArts = GREY "Not supported"
+  c9-scope-picker-after.png     supported     "Codearts" offered alongside "Claude Code"
+  c9-scope-picker-before.png    not-supported only "Claude Code" offered (Codearts dropped)
+  c9-scope-picker-empty.png     empty         "No results found."
+  (c9-scanner-badge-guarded.png intentionally absent — no guarded CodeArts data exists)

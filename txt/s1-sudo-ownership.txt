@@ -1,0 +1,88 @@
+==============================================================================
+EVIDENCE s1-sudo-ownership : root-context install & per-user file ownership
+git commit: 290c2aa11563   scanner: /home/coder/.codeartsdoer/plugin/onyx/onyx-scanner
+date: 2026-09-16T19:26:24Z
+==============================================================================
+
+### passwordless sudo check ###
+$ sudo -n true ; echo exit=$?
+exit=0  (0 => passwordless sudo IS available on this box)
+
+### IMPORTANT SAFETY CONSTRAINT ###
+The real /home/coder/.codeartsdoer QUALIFIES as CodeArts-installed
+(regular file at ~/.codeartsdoer/installers/codearts) and already carries a
+guard plugin. The root install (euid=0) enumerates EVERY system user via
+GetUserContextsToScan(privileged=true) and has NO per-user scoping flag, so a
+root WRITE install would rewrite the real /home/coder/.codeartsdoer plugin —
+which the task forbids. Therefore the root all-users path is exercised in
+--dry-run ONLY (writes nothing), and the real WRITE install of the second
+user's home is run directly AS that user (euid=s1testuser), which the kernel
+confines to /home/s1testuser and cannot touch coder's home.
+
+==============================================================================
+### (1) ROOT all-users path, DRY-RUN (proves enumeration; writes nothing) ###
+--- BEFORE: checksums of real /home/coder/.codeartsdoer/plugin ---
+0ac9c54b12586b9f4fc60e9e8e6e3d0f1c16ccb0ed4305d025314f8b42e9875c  /home/coder/.codeartsdoer/plugin/onyx-guard.ts
+7891c8dfd0f295f39d272e310b130b648d7560e37c1ef4d127dc653a1356109c  /home/coder/.codeartsdoer/plugin/onyx/onyx-config.json
+8a3a7b0d9954154d66ef15ffad55551231f31e93e454d847ffbcb5b617063e03  /home/coder/.codeartsdoer/plugin/onyx/onyx-scanner
+
+$ sudo env -i PATH=/usr/bin:/bin HOME=/root /home/coder/.codeartsdoer/plugin/onyx/onyx-scanner install codearts --dry-run --api-key K1 --endpoint http://localhost:8080
+2026-09-16T19:26:24.292603842Z	INFO	install_context	{"event": "install_context", "cycle_id": "69ce6649", "caller": "codearts_plugin", "platform": "linux", "parent_process_name": "timeout", "parent_pid": 1945099, "euid": 0, "is_privileged_context": true, "active_console_sessions": 0}
+2026-09-16T19:26:24.292705644Z	INFO	Running as root, targeting all users	{"userCount": 7}
+2026-09-16T19:26:24.292746682Z	INFO	Onyx guard plugin already installed. Use --force to overwrite.	{"pluginDir": "/home/caqauser1/.codeartsdoer/plugin"}
+2026-09-16T19:26:24.29276861Z	INFO	Onyx guard plugin already installed. Use --force to overwrite.	{"pluginDir": "/home/caqauser2/.codeartsdoer/plugin"}
+2026-09-16T19:26:24.29279027Z	INFO	Onyx guard plugin already installed. Use --force to overwrite.	{"pluginDir": "/home/coder/.codeartsdoer/plugin"}
+2026-09-16T19:26:24.292808934Z	INFO	Would install plugin (dry run)	{"pluginDir": "/home/s1testuser/.codeartsdoer/plugin"}
+📊 Dry run summary:
+plugin_dir: /home/caqauser1/.codeartsdoer/plugin, /home/caqauser2/.codeartsdoer/plugin, /home/coder/.codeartsdoer/plugin, /home/s1testuser/.codeartsdoer/plugin
+already_installed: true
+Would install:
+Run without --dry-run to apply these changes.
+
+--- AFTER: verify real coder plugin UNCHANGED by the root dry-run ---
+VERIFIED UNCHANGED: real /home/coder/.codeartsdoer/plugin checksums identical before/after.
+
+==============================================================================
+### (2) REAL second-user WRITE install — run AS s1testuser (euid=s1testuser) ###
+second user: s1testuser:x:1004:1004::/home/s1testuser:/bin/sh
+install-trigger planted (owned by s1testuser):
+-rwxrwxr-x 1 s1testuser s1testuser 15 Sep 16 19:24 /home/s1testuser/.codeartsdoer/installers/codearts
+(binary run from a world-readable copy of the SAME real binary — coder's home
+ is 0750/group coder so s1testuser cannot traverse it to exec the original;
+ checksum identical: 8a3a7b0d9954154d66ef15ffad55551231f31e93e454d847ffbcb5b617063e03)
+$ sudo -u s1testuser env HOME=/home/s1testuser PATH=/usr/bin:/bin /tmp/onyx-scanner-real install codearts --api-key K1 --endpoint http://localhost:8080
+2026-09-16T19:26:24.801484653Z	INFO	CodeArts plugin installation complete. Restart CodeArts for changes to take effect.
+📊 Installation summary:
+plugin_dir: /home/s1testuser/.codeartsdoer/plugin
+already_installed: false
+Installed:
+  - Guard plugin: ~/.codeartsdoer/plugin/onyx-guard.ts
+  - Scanner binary + config: ~/.codeartsdoer/plugin/onyx/
+CodeArts integration installed successfully!
+Restart CodeArts for changes to take effect.
+
+### ownership + mode — s1testuser (installed by this test) ###
+-rw-r--r-- 1 s1testuser s1testuser 23849 Sep 16 19:26 /home/s1testuser/.codeartsdoer/plugin/onyx-guard.ts
+drwxr-xr-x 2 s1testuser s1testuser 4096 Sep 16 19:26 /home/s1testuser/.codeartsdoer/plugin/onyx
+total 38848
+-rw------- 1 s1testuser s1testuser      194 Sep 16 19:26 onyx-config.json
+-rwxr-xr-x 1 s1testuser s1testuser 39774200 Sep 16 19:26 onyx-scanner
+
+### ownership + mode — coder (PRE-EXISTING; READ-ONLY, NOT written by this test) ###
+-rw-r--r-- 1 coder coder 23849 Sep 13 17:55 /home/coder/.codeartsdoer/plugin/onyx-guard.ts
+drwxr-xr-x 2 coder coder 4096 Sep 16 17:35 /home/coder/.codeartsdoer/plugin/onyx
+total 38848
+-rw------- 1 coder coder      282 Sep 16 17:35 onyx-config.json
+-rwxr-xr-x 1 coder coder 39774200 Sep 16 17:35 onyx-scanner
+
+==============================================================================
+### (3) NOT EXECUTED — true root all-users WRITE install ###
+NOT EXECUTED — the euid=0 all-users WRITE install (sudo onyx-scanner install
+codearts, no --dry-run) would rewrite the REAL /home/coder/.codeartsdoer plugin,
+which the task forbids, and the command exposes no flag to exclude coder. Its
+behaviour is instead proven safely above: (1) the root DRY-RUN shows the euid=0
+all-users enumeration and the per-user install/skip decision, and (2) the real
+per-user WRITE + chown outcome is demonstrated on s1testuser, whose installed
+files are owned by s1testuser:s1testuser — exactly the per-home ownership the
+root install's chownTreeToHomeDirOwner/chownNodesToHomeDirOwner produce.
+==============================================================================

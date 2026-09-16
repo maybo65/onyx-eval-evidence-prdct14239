@@ -1,0 +1,47 @@
+==============================================================================
+EVIDENCE s1-env-override : OPENCODE_CONFIG_DIR relocation of the CodeArts config home
+git commit: 290c2aa11563   scanner: /home/coder/.codeartsdoer/plugin/onyx/onyx-scanner
+date: 2026-09-16T19:21:16Z
+
+MECHANISM (verified against source internal/scanner/agents/dsl_ops/ops_io.go):
+  The DSL configDirs = [ GetEnvVariable('OPENCODE_CONFIG_DIR'), $HOME/.codeartsdoer ].
+  GetEnvVariable does NOT read a scanner flag; it reads the env var from /proc
+  across processes owned by the SCANNED USER. So the override is supplied here as
+  a genuine exported env var on the scanner invocation, whose process is owned by
+  the scanned user. To keep the scanned user real (it owns the process) while
+  redirecting the config-home BASE to a temp path, HOME basename == 'coder' and
+  the temp HOME deliberately contains NO .codeartsdoer (so the default candidate
+  is empty and any detection is attributable to the env override alone).
+host-state: temp HOME=/tmp/tmp.KVX9sKoOnS/coder (no .codeartsdoer); 'codearts' stub on PATH;
+            relocated config home at /tmp/tmp.KVX9sKoOnS/relocated-cfg-home with cli-data/settings.json(security).
+==============================================================================
+
+### (a) OPENCODE_CONFIG_DIR set to a REAL relocated config home ###
+relocated cli-data/settings.json = {"security":{"folderTrust":{"enabled":true}}}
+$ HOME=/tmp/tmp.KVX9sKoOnS/coder PATH=/tmp/tmp.KVX9sKoOnS/bin:$PATH OPENCODE_CONFIG_DIR=/tmp/tmp.KVX9sKoOnS/relocated-cfg-home /home/coder/.codeartsdoer/plugin/onyx/onyx-scanner scan --dry-run --scan-dockers=false --full-scan=false
+2026-09-16T19:21:21.376632706Z	INFO	agent_detection	{"event": "agent_detection", "platform": "linux", "agent": "codearts", "detected": true, "evidence_type": "dsl_dir", "evidence_path": "/tmp/tmp.KVX9sKoOnS/relocated-cfg-home", "username": "coder"}
+scan summary: Total: 2 agents, 0 MCP servers
+OUTCOME [a-relocated-valid]: codearts DETECTED
+
+  -> NOTE evidence_path resolves to the RELOCATED home (/tmp/tmp.KVX9sKoOnS/relocated-cfg-home), proving the
+     override drove detection, not $HOME/.codeartsdoer.
+
+### (b) OPENCODE_CONFIG_DIR set to a NON-EXISTENT / bogus path ###
+$ HOME=/tmp/tmp.KVX9sKoOnS/coder PATH=/tmp/tmp.KVX9sKoOnS/bin:$PATH OPENCODE_CONFIG_DIR=/nonexistent/bogus/xyz /home/coder/.codeartsdoer/plugin/onyx/onyx-scanner scan --dry-run --scan-dockers=false --full-scan=false
+(no codearts agent_detection line — NOT detected)
+scan summary: Total: 1 agents, 0 MCP servers
+OUTCOME [b-bogus-path]: codearts NOT detected
+
+
+### (c) OPENCODE_CONFIG_DIR UNSET (baseline; temp HOME has no .codeartsdoer) ###
+$ HOME=/tmp/tmp.KVX9sKoOnS/coder PATH=/tmp/tmp.KVX9sKoOnS/bin:$PATH  /home/coder/.codeartsdoer/plugin/onyx/onyx-scanner scan --dry-run --scan-dockers=false --full-scan=false
+(no codearts agent_detection line — NOT detected)
+scan summary: Total: 1 agents, 0 MCP servers
+OUTCOME [c-unset-baseline]: codearts NOT detected
+
+==============================================================================
+SUMMARY: A valid relocated config home pointed to by OPENCODE_CONFIG_DIR is
+detected (evidence_path = the relocated dir). A bogus path yields no detection,
+and with the var unset and no default config home present, nothing is detected —
+so case (a)'s detection is attributable solely to the env relocation.
+==============================================================================

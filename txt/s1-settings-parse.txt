@@ -1,0 +1,68 @@
+==============================================================================
+EVIDENCE s1-settings-parse : CodeArts DSL detector settings.json parse behavior
+git commit: 290c2aa11563   scanner: /home/coder/.codeartsdoer/plugin/onyx/onyx-scanner
+host-state: fresh temp HOME=$TMPHOME with .codeartsdoer/cli-data/ and a real
+            'codearts' stub binary on PATH (install-evidence gate satisfied).
+gate under test: suspectedDir._ok = And(BinaryOnPathForUser('codearts'),
+                 NotEmpty(GetMap(ParseJson(cli-data/settings.json),'security')))
+date: 2026-09-16T19:18:37Z
+==============================================================================
+
+### BASELINE (control): valid settings.json WITH non-empty security block ###
+settings.json = {"security":{"folderTrust":{"enabled":true},"blockedCommands":["rm -rf"]}}
+>>> CASE BASELINE-valid-security
+$ HOME=$TMPHOME PATH=$TMPHOME/bin:$PATH /home/coder/.codeartsdoer/plugin/onyx/onyx-scanner scan --dry-run --scan-dockers=false --full-scan=false
+2026-09-16T19:18:42.713376578Z	INFO	agent_detection	{"event": "agent_detection", "platform": "linux", "agent": "codearts", "detected": true, "evidence_type": "dsl_dir", "evidence_path": "/tmp/tmp.xj9MGbsxqE/.codeartsdoer", "username": "tmp.xj9MGbsxqE"}
+scan summary: Total: 2 agents, 0 MCP servers
+DETECTOR OUTCOME: codearts DETECTED (emitted as installed agent)
+
+### (a) settings.json ABSENT ###
+settings.json = <file does not exist> (0 files in cli-data)
+>>> CASE a-absent
+$ HOME=$TMPHOME PATH=$TMPHOME/bin:$PATH /home/coder/.codeartsdoer/plugin/onyx/onyx-scanner scan --dry-run --scan-dockers=false --full-scan=false
+(no codearts agent_detection line emitted)
+scan summary: Total: 1 agents, 0 MCP servers
+DETECTOR OUTCOME: codearts NOT emitted (fails closed — not reported as installed)
+
+### (b) settings.json present but TRUNCATED / invalid JSON ###
+settings.json = {"security": {trunca   <-- unparseable
+>>> CASE b-invalid-json
+$ HOME=$TMPHOME PATH=$TMPHOME/bin:$PATH /home/coder/.codeartsdoer/plugin/onyx/onyx-scanner scan --dry-run --scan-dockers=false --full-scan=false
+(no codearts agent_detection line emitted)
+scan summary: Total: 1 agents, 0 MCP servers
+DETECTOR OUTCOME: codearts NOT emitted (fails closed — not reported as installed)
+
+### (c) settings.json present, valid JSON, but EMPTY security block ###
+settings.json = {"security": {}}
+>>> CASE c-empty-security
+$ HOME=$TMPHOME PATH=$TMPHOME/bin:$PATH /home/coder/.codeartsdoer/plugin/onyx/onyx-scanner scan --dry-run --scan-dockers=false --full-scan=false
+(no codearts agent_detection line emitted)
+scan summary: Total: 1 agents, 0 MCP servers
+DETECTOR OUTCOME: codearts NOT emitted (fails closed — not reported as installed)
+
+### (c2) settings.json present, valid JSON, security key MISSING ###
+settings.json = {"theme":"dark"}
+>>> CASE c2-missing-security
+$ HOME=$TMPHOME PATH=$TMPHOME/bin:$PATH /home/coder/.codeartsdoer/plugin/onyx/onyx-scanner scan --dry-run --scan-dockers=false --full-scan=false
+(no codearts agent_detection line emitted)
+scan summary: Total: 1 agents, 0 MCP servers
+DETECTOR OUTCOME: codearts NOT emitted (fails closed — not reported as installed)
+
+==============================================================================
+CONCLUSION — DEFAULT WHEN settings.json CANNOT BE READ/PARSED:
+  The detector FAILS CLOSED: cases (a) absent, (b) invalid JSON, (c/c2) empty or
+  missing 'security' block all yield content_ok=false, so _ok=And(...)=false and
+  CodeArts is NOT emitted as an installed agent (no agent_detection line, no row).
+  Only the BASELINE — binary on PATH AND a parseable, non-empty security block —
+  reports detected:true.
+
+WHY THIS IS THE SAFE SIDE (honest inventory):
+  Emission is gated on POSITIVE confirmation of a live, valid install, never on
+  the mere presence of a config tree. Per the detector's own rationale, the
+  'codearts' binary lives INSIDE ~/.codeartsdoer/installers/, so an uninstalled
+  CLI leaves the whole config home (and a settings.json) on disk. Defaulting an
+  unreadable/garbage/empty-security config to NOT-detected prevents the scanner
+  from minting a false or duplicate CodeArts asset from leftover residue —
+  over-claiming an agent would create phantom inventory and false security
+  posture. Fail-closed here means: do not claim what you cannot validate.
+==============================================================================

@@ -1,0 +1,72 @@
+# S3/C7/C16/C1 real-agent chain — Huawei Cloud IAM auth wall (bucket-b blocker)
+# commit: 290c2aa11563   captured: 2026-09-16T19:19:16Z   host: Linux ip-10-10-6-235 6.8.0-1063-aws #66~22.04.1-Ubuntu SMP Fri Aug  7 17:45:18 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+# codearts version: 26.9.4
+
+## 1) No credentials: CLI aborts at the front door before loading any plugin
+$ codearts run 'print OK' --print-logs --log-level DEBUG
+│
+●  Authentication failed. Environment variables CODEARTS_CLI_AK and CODEARTS_CLI_SK are not set. Apply for an AK/SK on the Huawei Cloud IAM console and configure them as environment variables to use CLI commands. Operation guide:
+│  https://codearts.ap-southeast-1.huaweicloud.com/portal/settings/cli-auth
+--- stderr ---
+INFO  2026-09-17T03:16:57 +36ms service=default "codearts" version=26.9.4 args=["run", "print OK", "--print-logs", "--log-level", "DEBUG"]
+INFO  2026-09-17T03:16:57 +0ms service=global-config-holder "GlobalConfigHolder: config getter registered"
+INFO  2026-09-17T03:16:57 +1ms service=domain-switch "initDomainSwitch: domain fields unchanged, skip re-init"
+INFO  2026-09-17T03:16:57 +4ms service=env-credential "hasCodeartsCliCredential 检查结果" result=false hasCODEARTS_CLI_AK=false hasCODEARTS_CLI_SK=false
+INFO  2026-09-17T03:16:57 +0ms service=env-credential "hasHwEnvCredential 检查结果" hasHW_ACCESS_KEY=false hasHW_SECRET_KEY=false hasHW_SECURITY_TOKEN=false
+INFO  2026-09-17T03:16:57 +0ms service=env-credential "hasAnyEnvCredential 检查结果" result=false
+
+## 2) Dummy AK/SK passes the local presence check, then Huawei IAM getUserInfo returns 503 -> no session
+$ CODEARTS_CLI_AK=dummyak CODEARTS_CLI_SK=dummysk codearts run 'print OK' --print-logs --log-level DEBUG   (exit 124: timed out still spinning on auth)
+INFO  2026-09-17T03:17:33 +5ms service=env-credential "hasCodeartsCliCredential 检查结果" result=true hasCODEARTS_CLI_AK=true hasCODEARTS_CLI_SK=true
+INFO  2026-09-17T03:17:33 +0ms service=env-credential "hasAnyEnvCredential 检查结果" result=true
+INFO  2026-09-17T03:17:33 +0ms service=env-credential "hasCodeartsCliCredential 检查结果" result=true hasCODEARTS_CLI_AK=true hasCODEARTS_CLI_SK=true
+INFO  2026-09-17T03:17:33 +0ms service=auth "使用环境变量CODEARTS_CLI_AK/SK授权CLI"
+INFO  2026-09-17T03:17:33 +1ms service=auth "当前 GlobalConfig.userInfo 中的凭证信息" hasAccessKeyId=true hasSecretAccessKey=true
+INFO  2026-09-17T03:17:33 +0ms service=env-credential "resolveAkSk 开始解析凭证"
+INFO  2026-09-17T03:17:33 +0ms service=env-credential "getAkSkFromEnv 开始检查环境变量"
+INFO  2026-09-17T03:17:33 +1ms service=env-credential "从环境变量 CODEARTS_CLI_AK/SK ****"
+INFO  2026-09-17T03:17:33 +0ms service=env-credential "resolveAkSk 使用环境变量凭证" source=codearts_cli
+INFO  2026-09-17T03:17:33 +0ms service=auth "resolveAkSk 解析结果" hasAk=true hasSk=true hasSecurityToken=false
+INFO  2026-09-17T03:17:33 +0ms service=auth "开始调用 getUserInfo API"
+INFO  2026-09-17T03:17:33 +1ms service=provider-proxy "[proxy-diag] source: System, platform: linux"
+INFO  2026-09-17T03:17:33 +0ms service=provider-proxy "start get SystemProxy"
+WARN  2026-09-17T03:17:33 +8ms service=provider-proxy "Failed to get GNOME proxy settings"
+WARN  2026-09-17T03:17:33 +0ms service=provider-proxy "Failed to read kioslaverc"
+INFO  2026-09-17T03:17:33 +0ms service=provider-proxy "[proxy-diag] noProxy IDE: "", Env: "", System: """
+INFO  2026-09-17T03:17:33 +1ms service=provider-proxy "[proxy-diag] final proxy: , noProxy:lo****st,127.0.0.1"
+ERROR  2026-09-17T03:17:34 +0ms service=auth "调用错误：503{}"
+INFO  2026-09-17T03:17:34 +0ms service=auth "getUserInfo API 返回结果" hasUserInfo=false user_id=undefined domain_id=undefined
+ERROR  2026-09-17T03:17:34 +0ms service=auth "getUserInfo 返回空值，无法更新用户信息"
+
+## Conclusion: the CodeArts CLI authenticates EVERY session against Huawei Cloud IAM (getUserInfo)
+## BEFORE it loads the onyx-guard plugin or executes any tool. Without valid Huawei Cloud AK/SK
+## (a vendor credential not present on this box and not obtainable here), no real 'codearts run'
+## session can start, so the agent->plugin->scanner chain cannot be exercised through the real
+## agent on this host. The plugin/scanner/guard components themselves are proven independently
+## (scanner e2e, guard evaluate lane); what is blocked is ONLY the real-agent driver.
+
+## 3) The IAM gate is COMPREHENSIVE — it fires before plugin load on EVERY session-start subcommand
+## (re-probed 2026-09-17, commit 290c2aa11563), not only `codearts run`:
+
+$ codearts models            # list providers/models
+●  Authentication failed. Environment variables CODEARTS_CLI_AK and CODEARTS_CLI_SK are not set.
+   Apply for an AK/SK on the Huawei Cloud IAM console ... (no models listed; aborts before any plugin/provider load)
+
+$ codearts serve --print-logs --log-level DEBUG    # headless server
+INFO service=default "codearts" version=26.9.4 args=["serve","--print-logs","--log-level","DEBUG"]
+INFO service=env-credential "hasCodeartsCliCredential 检查结果" result=false hasCODEARTS_CLI_AK=false hasCODEARTS_CLI_SK=false
+INFO service=env-credential "hasAnyEnvCredential 检查结果" result=false
+●  Authentication failed. Environment variables CODEARTS_CLI_AK and CODEARTS_CLI_SK are not set. ...
+   (server never binds; plugin dir never globbed)
+
+## Subcommand inventory (codearts --help): run / serve / acp / attach / models / session / export ... —
+## every session-starting path routes through the same auth gate above. `codearts mcp` (MCP config mgmt)
+## and completion are config-only and start no session/plugin either.
+##
+## NET: hop 1 of the launch chain (CodeArts agent runtime -> loads ~/.codeartsdoer/plugin/onyx-guard.ts)
+## cannot be exercised on this box without a valid Huawei Cloud AK/SK (a vendor credential not present and
+## not obtainable here). This is a genuine bucket-(b) blocker for the AGENT-DRIVEN leg ONLY. Hops 2->3->4
+## (plugin -> onyx-scanner child -> guard HTTP -> verdict -> rendered block text) ARE driven for real
+## independently (see s3-scanner-hooks-chain.txt and c16-real-plugin-renders.txt): the plugin module, the
+## scanner binary and the guard backend are all the real components; only the agent host object (hop 1)
+## is substituted, because the agent itself will not start without the vendor credential.

@@ -1,0 +1,130 @@
+================================================================================
+C7 — REAL MCP-authorize (sanction) lane -> UNSANCTIONED BLOCK + SANCTIONED ALLOW
+       source=codearts, real scanner -> real Onyx access-control backend
+================================================================================
+Commit:            290c2aa11563d0c5325995c2b77236065be6cb36 (fix(scanner): sanction CodeArts MCP tool calls)
+Captured (UTC):    2026-09-16T20:37:07Z   (lane runs at 20:36:04 / 20:36:19 / 20:36:28Z)
+Scanner binary:    /tmp/onyx-scanner-fixed  (sha256 88d79e965814d69c...; built from THIS branch's
+                   scanner/ source — see "STALE INSTALLED BINARY" note below)
+Exact hop driven:  onyx-scanner hooks --source=codearts --type=tool --verbose
+                   stdin = an MCP tool call (tool_name "onyx-verify-probe_echo")
+                   env OPENCODE_CONFIG=/home/coder/.codeartsdoer/codearts_cli.json
+Endpoint URL used: http://localhost:8080   (Kong front door, from onyx-config.json endpoint-url)
+Authorize route:   POST /access-control/authorize/{source}/{client_info}   (source=codearts)
+API key (redact):  MCPGat... (first 6 chars; real provisioned key from onyx-config.json)
+CodeArts asset:    id 230 = "CodeArts (ca-home, coder, home, r7-ca-home)"  (endpoint_codearts)
+Probe MCP server:  key "onyx-verify-probe" -> remote https://mcp-probe.codearts-verify.onyx.security/mcp
+                   (from codearts_cli.json; mcp_package_cache id 48; app_definition_id
+                    "mcp-probe.codearts-verify.onyx.security/mcp")
+
+NOTHING is mocked: the onyx-scanner binary, the OpenCode/CodeArts MCP-identity resolver,
+the Kong front door, the Python access-control /authorize backend, and Postgres are all
+the real running stack. Only the SANCTION STATE is set by test (a real access_control row).
+
+--------------------------------------------------------------------------------
+HOW sanctioned-vs-unsanctioned is decided for source=codearts (from source)
+--------------------------------------------------------------------------------
+scanner/cmd/hooks.go            -> runMCPGuardLanes() fires two legs concurrently:
+                                   (1) sanction authorize, (2) MCP-lane content evaluate.
+                                   emitMCPGuardBlock precedence: SANCTION block > policy block.
+scanner/cmd/hooks_mcp_sanction.go:223
+      case types.SourceOpenCode, types.SourceCodeArts:   <-- THE FIX under test.
+      CodeArts routes through opencodeidentity.Resolve (CodeArts == rebranded OpenCode).
+      Before this commit CodeArts fell through to the non-MCP path (outcome=non_mcp,
+      sanction_action=skipped) and MCP tool calls were NEVER sanction-checked.
+Backend backend_python/.../api/routes/access_control.py authorize_server():
+      decode client_info -> get_mcp_server_lookup (mcp_package_cache by cache_key)
+      -> app_definition_id + version -> get_mcp_server_access_control_with_priority():
+         version-specific rule (access_control.asset_id) > app-wide rule
+         (access_control.app_definition_id, asset_id IS NULL) > legacy connector > tenant default.
+      access_control.status: Sanctioned=allow, Unsanctioned=block, no-rule=tenant default.
+
+  => The decision is driven by the access_control TABLE (NOT assets.status). To drive the
+     pair for real, one app-wide access_control row was created for app_definition_id
+     "mcp-probe.codearts-verify.onyx.security/mcp" and flipped Unsanctioned -> Sanctioned,
+     then DELETED to restore the neutral (no-rule) default. codearts_cli.json was NOT
+     modified (byte-identical throughout; md5 d2aaad399b8d8dacd21307d41fc28d38).
+
+Regression pin: scanner/cmd/codearts_mcp_guard_hooks_e2e_test.go
+                func TestCodeArtsMCPGuardHooks_E2E_Sanctioning  (in-process pin of exactly
+                this lane: unsanctioned authorize -> block reaches hook output).
+
+################################################################################
+# (a) UNSANCTIONED MCP server tool call  ->  guard BLOCK  (block reaches hook output)
+#     access_control row: app_definition_id=mcp-probe.codearts-verify.onyx.security/mcp,
+#                         asset_id=NULL, status='Unsanctioned' (id cd8bb2a7-...)
+################################################################################
+
+--- stdin (full request payload piped to scanner) ---
+{"opencode_version":"0.4.2","session_id":"ses_c7BLOCK_20260916T210100Z","run_id":"run_c7BLOCK","tool_call_id":"tc_c7BLOCK","mcp_call_id":"mcp_c7BLOCK","tool_name":"onyx-verify-probe_echo","tool_params":{"text":"c7 unsanctioned probe"},"directory":"/home/coder/project","worktree":"/home/coder/project"}
+
+--- stdout (verbatim REAL backend-driven hook output) ---
+{"action":"block","block_reason":["MCP server 'mcp-probe.codearts-verify.onyx.security/mcp' is not authorized for use in your organization and has been blocked by Onyx."]}
+
+--- verbose log (mcp_identity_outcome + hook_invocation), verbatim ---
+2026-09-16T20:36:19.148586415Z	INFO	mcp_identity_outcome	{"event": "mcp_identity_outcome", "hook_source": "codearts", "hook_type": "tool", "outcome": "resolved_remote", "matched_key": "onyx-verify-probe", "transport": "http", "sanction_action": "block", "sanction_target": "https://mcp-probe.codearts-verify.onyx.security/mcp", "target_kind": "remote", "authorize_request_sent": true, "authorize_status_code": 200, "backend_action": "block", "sanction_fail_open_reason": "", "elapsed_ms": 63, "mcp_lane_leg": "request", "mcp_lane_outcome": "sent", "mcp_lane_request_sent": true, "mcp_lane_status_code": 200, "mcp_lane_action": "allow", "mcp_lane_elapsed_ms": 56}
+2026-09-16T20:36:19.148699308Z	INFO	hook_invocation	{"event": "hook_invocation", "hook_source": "codearts", "hook_type": "tool", "session_id": "ses_c7BLOCK_20260916T210100Z", "is_mcp_tool": true, "mcp_guard_hooks": true, "outcome": "resolved_remote", "sanction_action": "block", "evaluate_action": "skipped", "api_key_source": "file", "exit_code": 0, "elapsed_ms": 64, "sample_rate": 1}
+
+  Read this: sanction_action=block, authorize_status_code=200 (REAL backend verdict),
+  backend_action=block. The content lane's own verdict was mcp_lane_action=allow, and
+  evaluate_action=skipped — proving SANCTION block OUTRANKS the content lane (mcpGuardBlock
+  precedence). is_mcp_tool=true confirms the CodeArts MCP path (the fix) engaged.
+
+################################################################################
+# (b) SANCTIONED MCP server tool call  ->  guard ALLOW
+#     same access_control row updated to status='Sanctioned'
+################################################################################
+
+--- stdin (full request payload piped to scanner) ---
+{"opencode_version":"0.4.2","session_id":"ses_c7ALLOW_20260916T210200Z","run_id":"run_c7ALLOW","tool_call_id":"tc_c7ALLOW","mcp_call_id":"mcp_c7ALLOW","tool_name":"onyx-verify-probe_echo","tool_params":{"text":"c7 sanctioned probe"},"directory":"/home/coder/project","worktree":"/home/coder/project"}
+
+--- stdout (verbatim REAL backend-driven hook output) ---
+{"action":"allow"}
+
+--- verbose log (mcp_identity_outcome + hook_invocation), verbatim ---
+2026-09-16T20:36:28.94003055Z	INFO	mcp_identity_outcome	{"event": "mcp_identity_outcome", "hook_source": "codearts", "hook_type": "tool", "outcome": "resolved_remote", "matched_key": "onyx-verify-probe", "transport": "http", "sanction_action": "allow", "sanction_target": "https://mcp-probe.codearts-verify.onyx.security/mcp", "target_kind": "remote", "authorize_request_sent": true, "authorize_status_code": 200, "backend_action": "allow", "sanction_fail_open_reason": "", "elapsed_ms": 73, "mcp_lane_leg": "request", "mcp_lane_outcome": "sent", "mcp_lane_request_sent": true, "mcp_lane_status_code": 200, "mcp_lane_action": "allow", "mcp_lane_elapsed_ms": 59}
+2026-09-16T20:36:28.940128624Z	INFO	hook_invocation	{"event": "hook_invocation", "hook_source": "codearts", "hook_type": "tool", "session_id": "ses_c7ALLOW_20260916T210200Z", "is_mcp_tool": true, "mcp_guard_hooks": true, "outcome": "resolved_remote", "sanction_action": "allow", "evaluate_action": "allow", "api_key_source": "file", "exit_code": 0, "elapsed_ms": 73, "sample_rate": 1}
+
+  Read this: the ONLY thing changed between (a) and (b) is access_control.status
+  (Unsanctioned -> Sanctioned). sanction_action flips block -> allow; backend_action=allow.
+
+################################################################################
+# DB ATTRIBUTION — the block is attributed to CodeArts asset 230
+################################################################################
+
+The MCP sanction/authorize block is a pre-execution ACCESS-CONTROL decision; it does NOT
+write an ai_firewall_alert_violated_rules row (that table is the CONTENT-eval lane's
+persistence, e.g. the S3 shell-command DENY, violation 8bd37f... on session 359). The
+sanction lane's attribution is the usage_sessions row keyed to the CodeArts asset:
+
+-- usage_sessions (queried via /tmp/r7-psql.sh, schema onyx_security) --
+ id  |          external_id           | app_id
+-----+--------------------------------+--------
+ 368 | ses_c7BLOCK_20260916T210100Z   |    230   <- BLOCK session -> app_id 230 == CodeArts asset
+ 369 | ses_c7ALLOW_20260916T210200Z   |    230   <- ALLOW session -> app_id 230 == CodeArts asset
+(external_id == the session_id in each stdin payload; app_id 230 == asset "CodeArts (...)" )
+
+-- access_control rule that drove the pair (created, flipped, then DELETED) --
+ id                                   | status(a->b)           | app_definition_id
+ cd8bb2a7-8b77-4008-b559-902080911918 | Unsanctioned -> Sanctioned | mcp-probe.codearts-verify.onyx.security/mcp
+
+################################################################################
+# STALE INSTALLED BINARY — why /tmp/onyx-scanner-fixed and not the installed copy
+################################################################################
+The scanner installed at /home/coder/.codeartsdoer/plugin/onyx/onyx-scanner (mtime
+2026-09-16 17:35:24Z) PREDATES fix commit 290c2aa11563 (2026-09-16 18:18:09Z). Driven
+with the exact payloads above it returns outcome=non_mcp, sanction_action=skipped — i.e.
+the pre-fix bug, MCP tool calls never sanction-checked. /tmp/onyx-scanner-fixed is the
+scanner built from THIS branch's scanner/ source (`go build .`), so it carries the
+hooks_mcp_sanction.go:223 CodeArts case. It IS the real scanner for the PR under test; the
+installed copy is simply stale. The regression pin TestCodeArtsMCPGuardHooks_E2E_Sanctioning
+covers this same lane in-process at HEAD.
+
+################################################################################
+# STATE RESTORED
+################################################################################
+- access_control table: rule DELETED; SELECT count(*) = 0 (neutral no-rule default restored).
+  Post-delete re-run (ses_c7RESTORE) returns {"action":"allow"} == tenant default -> confirms
+  the block was caused by the rule and nothing residual remains.
+- assets.id 992 (onyx-verify-probe): status = AssetStatusDiscovered (unchanged/restored).
+- codearts_cli.json: NEVER modified; md5 d2aaad399b8d8dacd21307d41fc28d38 == /tmp/cli.bak.

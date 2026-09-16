@@ -1,0 +1,90 @@
+================================================================================
+C14 — REAL onyx-scanner uninstall codearts  (help + --dry-run + real run)
+================================================================================
+Commit:         290c2aa11563d0c5325995c2b77236065be6cb36
+Captured (UTC): 2026-09-16T20:50:32Z
+Binary:         /tmp/onyx-scanner-fixed (built from THIS branch scanner/ source; sha256 88d79e965814d69c...)
+                installed copy is stale/pre-fix, so branch strings are proven from the branch build.
+Config home:    /home/coder/.codeartsdoer
+
+############################ (1) uninstall codearts --help ####################
+Uninstall Huawei Cloud CodeArts integration with the Onyx AI Guard.
+
+Removes the guard plugin (~/.codeartsdoer/plugin/onyx-guard.ts and its onyx/
+subdir). CodeArts's plugin/ directory is shared with the user's other plugins, so
+only the Onyx-owned artifacts are removed — never the whole plugin/ dir.
+
+When running as root (sudo), the integration is removed for all users on the
+machine. Otherwise, it is removed only for the current user.
+
+The command is idempotent - running it multiple times is safe.
+
+Use --dry-run to preview changes without applying them.
+
+Usage:
+  onyx-scanner uninstall codearts [flags]
+
+Flags:
+      --dry-run                Show what would be changed without applying modifications
+  -h, --help                   help for codearts
+      --scan-api-key string    API key for post-operation scan (optional)
+      --scan-endpoint string   Ingest endpoint for post-operation scan (optional)
+  -v, --verbose                Enable verbose output
+
+Global Flags:
+      --dsl-enabled      Detect claude-code and the Codex CLI with the DSL envelope instead of the native Go detectors (env: ONYX_SCANNER_DSL_ENABLED; default legacy Go; an explicit flag beats the env)
+      --log-dir string   Directory to store log files (default "~/.onyx/mcp-scanner/logs")
+  -q, --quiet            Don't print logs to console
+      --skip-certs       Skip SSL certificate verification (env: ONYX_SKIP_CERTS)
+
+############################ (2) uninstall codearts --dry-run #################
+--- plugin dir BEFORE ---
+total 36
+drwxr-xr-x  3 coder coder  4096 Sep 13 12:39 .
+drwxr-xr-x 10 coder coder  4096 Sep 13 12:39 ..
+drwxr-xr-x  2 coder coder  4096 Sep 16 17:35 onyx
+-rw-r--r--  1 coder coder 23849 Sep 13 17:55 onyx-guard.ts
+--- output ---
+2026-09-16T20:50:32.678903149Z	INFO	Scanner starting	{"version": "dev", "environment": "dev", "command": "onyx-scanner uninstall codearts", "trigger_method": "", "invocation_source": "", "executable": "/tmp/onyx-scanner-fixed", "pid": 2730908, "ppid": 2730860, "username": "coder", "user_id": "1001", "group_id": "1001", "euid": 1001, "home_dir": "/home/coder", "hostname": "ip-10-10-6-235", "os": "linux", "platform": "ubuntu", "platform_family": "debian", "os_version": "22.04", "kernel_version": "6.8.0-1063-aws", "kernel_arch": "x86_64", "architecture": "amd64", "go_version": "go1.26.6", "working_dir": "/home/coder/onyx"}
+2026-09-16T20:50:32.679002175Z	INFO	Starting CodeArts uninstallation
+2026-09-16T20:50:32.679006729Z	INFO	Uninstalling CodeArts integration
+2026-09-16T20:50:32.679013508Z	INFO	Starting CodeArts plugin uninstallation
+2026-09-16T20:50:32.679027918Z	INFO	Would remove Onyx guard plugin (dry run)	{"entry": "/home/coder/.codeartsdoer/plugin/onyx-guard.ts", "onyxDir": "/home/coder/.codeartsdoer/plugin/onyx"}
+2026-09-16T20:50:32.679032419Z	INFO	CodeArts plugin uninstallation complete. Restart CodeArts for changes to take effect.
+Dry run summary:
+plugin_dir: /home/coder/.codeartsdoer/plugin
+existed: true
+Would remove:
+  - Onyx guard plugin (onyx-guard.ts + onyx/ subdir)
+Run without --dry-run to apply these changes.
+2026-09-16T20:50:32.679041087Z	INFO	CodeArts uninstall command completed successfully
+--- plugin dir AFTER dry-run (unchanged) ---
+total 36
+drwxr-xr-x  3 coder coder  4096 Sep 13 12:39 .
+drwxr-xr-x 10 coder coder  4096 Sep 13 12:39 ..
+drwxr-xr-x  2 coder coder  4096 Sep 16 17:35 onyx
+-rw-r--r--  1 coder coder 23849 Sep 13 17:55 onyx-guard.ts
+
+############################ (3) uninstall codearts (REAL) ####################
+2026-09-16T20:50:32.695735398Z	INFO	Scanner starting	{"version": "dev", "environment": "dev", "command": "onyx-scanner uninstall codearts", "trigger_method": "", "invocation_source": "", "executable": "/tmp/onyx-scanner-fixed", "pid": 2730916, "ppid": 2730860, "username": "coder", "user_id": "1001", "group_id": "1001", "euid": 1001, "home_dir": "/home/coder", "hostname": "ip-10-10-6-235", "os": "linux", "platform": "ubuntu", "platform_family": "debian", "os_version": "22.04", "kernel_version": "6.8.0-1063-aws", "kernel_arch": "x86_64", "architecture": "amd64", "go_version": "go1.26.6", "working_dir": "/home/coder/onyx"}
+2026-09-16T20:50:32.695809842Z	INFO	Starting CodeArts uninstallation
+2026-09-16T20:50:32.695816513Z	INFO	Uninstalling CodeArts integration
+2026-09-16T20:50:32.695826241Z	INFO	Starting CodeArts plugin uninstallation
+2026-09-16T20:50:32.702034668Z	INFO	CodeArts plugin uninstalled for user	{"homeDir": "/home/coder"}
+2026-09-16T20:50:32.702051263Z	INFO	CodeArts plugin uninstallation complete. Restart CodeArts for changes to take effect.
+Uninstallation summary:
+plugin_dir: /home/coder/.codeartsdoer/plugin
+existed: true
+Removed:
+  - Onyx guard plugin (onyx-guard.ts + onyx/ subdir)
+
+CodeArts integration uninstalled successfully!
+Restart CodeArts for changes to take effect.
+2026-09-16T20:50:32.702063953Z	INFO	CodeArts uninstall command completed successfully
+--- plugin dir AFTER real uninstall ---
+total 8
+drwxr-xr-x  2 coder coder 4096 Sep 16 20:50 .
+drwxr-xr-x 10 coder coder 4096 Sep 13 12:39 ..
+--- onyx-guard.ts present? ---
+ls: cannot access '/home/coder/.codeartsdoer/plugin/onyx-guard.ts': No such file or directory
+onyx-guard.ts REMOVED (uninstall effective)

@@ -1,0 +1,146 @@
+================================================================================
+S1 EVIDENCE: CodeArts guard-plugin installer — euid-0 ALL-USERS branch on real host
+================================================================================
+commit:      290c2aa11563 (290c2aa11563d0c5325995c2b77236065be6cb36)
+captured_at: 2026-09-16T20:25:29Z (UTC)
+uname -a:    Linux ip-10-10-6-235 6.8.0-1063-aws #66~22.04.1-Ubuntu SMP Fri Aug  7 17:45:18 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+scanner bin: /tmp/s1-onyx-scanner (copy of real 39774200-byte onyx-scanner; sha256 below)
+sha256:      8a3a7b0d9954154d66ef15ffad55551231f31e93e454d847ffbcb5b617063e03  /tmp/s1-onyx-scanner
+             8a3a7b0d9954154d66ef15ffad55551231f31e93e454d847ffbcb5b617063e03  (live coder plugin binary, for identity comparison — NOT modified)
+================================================================================
+
+GOAL: prove the euid==0 all-users install branch executes on a real Linux host:
+  as root it installs the plugin into MULTIPLE users' homes, then chowns every
+  written file BACK to each target user's uid:gid (the MDM-as-root case).
+
+WHICH VARIANT WAS EXERCISED: the TRUE all-users enumeration.
+  Install.Install() -> utils.GetUserContextsToScan(root) -> GetAllUserHomeDirs ->
+  provider.GetNativeUsers() reads /etc/passwd + lists /home. Ran under a private
+  mount namespace (unshare -m) that bind-mounts a scratch /etc/passwd (root + two
+  non-root target users s1u1=6001, s1u2=6002) and a scratch /home whose home dirs
+  are owned by uid 6001/6002. This drives the REAL enumeration over 2 non-root
+  target homes while keeping the box's real users (coder, etc.) invisible so
+  /home/coder/.codeartsdoer is never touched. Because each home is owned by a uid
+  != euid(0), chown_unix.go homeDirOwnerUID returns ok=true and the chown-back
+  (chownTreeToHomeDirOwner + chownNodesToHomeDirOwner) fires for real.
+
+INVOCATION (run as real root, euid 0):
+  sudo env ONYX_IGNORE_SENSOR=1 unshare -m bash -c \
+    "mount --bind /tmp/s1eval/passwd /etc/passwd; \
+     mount --bind /tmp/s1eval/home  /home; \
+     /tmp/s1-onyx-scanner install codearts --verbose \
+       --api-key=dummy_s1_key --endpoint=https://ai-guard.example.invalid"
+
+SCRATCH LAYOUT (2 non-root target users, homes owned by uid!=0):
+--- /tmp/s1eval/passwd (bind-mounted over /etc/passwd in the namespace) ---
+root:x:0:0:root:/root:/bin/bash
+s1u1:x:6001:6001:S1 target user 1:/home/s1u1:/bin/bash
+s1u2:x:6002:6002:S1 target user 2:/home/s1u2:/bin/bash
+--- /tmp/s1eval/home ownership (bind-mounted over /home) ---
+total 8
+drwxr-xr-x 3 6001 6001 4096 Sep 16 20:24 s1u1
+drwxr-xr-x 3 6002 6002 4096 Sep 16 20:24 s1u2
+--- per-user CodeArts install signal (installers/bin/codearts regular file) ---
+-rwxr-xr-x 1 6001 6001 37 Sep 16 20:24 /tmp/s1eval/home/s1u1/.codeartsdoer/installers/bin/codearts
+-rwxr-xr-x 1 6002 6002 37 Sep 16 20:24 /tmp/s1eval/home/s1u2/.codeartsdoer/installers/bin/codearts
+
+================================================================================
+STEP A — REAL INSTALL RUN (verbatim stdout+stderr, --verbose)
+================================================================================
+2026-09-16T20:24:21.71962436Z	INFO	Scanner starting	{"version": "dev", "environment": "dev", "command": "onyx-scanner install codearts", "trigger_method": "", "invocation_source": "", "executable": "/tmp/s1-onyx-scanner", "pid": 2487906, "ppid": 2487903, "username": "root", "user_id": "0", "group_id": "0", "euid": 0, "home_dir": "/root", "hostname": "ip-10-10-6-235", "os": "linux", "platform": "ubuntu", "platform_family": "debian", "os_version": "22.04", "kernel_version": "6.8.0-1063-aws", "kernel_arch": "x86_64", "architecture": "amd64", "go_version": "go1.26.6", "working_dir": "/home/coder/onyx"}
+2026-09-16T20:24:21.719707695Z	INFO	Starting CodeArts installation
+2026-09-16T20:24:21.719714088Z	DEBUG	codearts_install_flags: dry_run=false, verbose=true, force=false, endpoint=https://ai-guard.example.invalid
+2026-09-16T20:24:21.720460939Z	INFO	install_context	{"event": "install_context", "cycle_id": "65030d24", "caller": "codearts_plugin", "platform": "linux", "parent_process_name": "bash", "parent_pid": 2487903, "euid": 0, "is_privileged_context": true, "active_console_sessions": 0}
+2026-09-16T20:24:21.720478361Z	INFO	Installing CodeArts integration
+2026-09-16T20:24:21.720486517Z	INFO	Starting CodeArts plugin installation
+2026-09-16T20:24:21.720558759Z	WARN	keychain_outcome	{"event": "keychain_outcome", "op": "put", "outcome": "fallback_env", "reason": "keychain_unavailable", "caller": "codearts_plugin", "cycle_id": "65030d24", "platform": "linux", "target_home_set": true, "target_home_tail": "s1u1", "target_index": 0, "total_targets": 3, "error": "exec: \"dbus-launch\": executable file not found in $PATH"}
+2026-09-16T20:24:21.720586444Z	WARN	keychain_outcome	{"event": "keychain_outcome", "op": "put", "outcome": "fallback_env", "reason": "keychain_unavailable", "caller": "codearts_plugin", "cycle_id": "65030d24", "platform": "linux", "target_home_set": true, "target_home_tail": "s1u2", "target_index": 1, "total_targets": 3, "error": "exec: \"dbus-launch\": executable file not found in $PATH"}
+2026-09-16T20:24:21.720609274Z	WARN	keychain_outcome	{"event": "keychain_outcome", "op": "put", "outcome": "fallback_env", "reason": "keychain_unavailable", "caller": "codearts_plugin", "cycle_id": "65030d24", "platform": "linux", "target_home_set": true, "target_home_tail": "root", "target_index": 2, "total_targets": 3, "error": "exec: \"dbus-launch\": executable file not found in $PATH"}
+2026-09-16T20:24:21.720634869Z	INFO	Running as root, targeting all users	{"userCount": 3}
+2026-09-16T20:24:21.793712391Z	DEBUG	Scanner binary installed	{"path": "/home/s1u1/.codeartsdoer/plugin/onyx/onyx-scanner"}
+2026-09-16T20:24:21.793868525Z	DEBUG	Config file installed	{"path": "/home/s1u1/.codeartsdoer/plugin/onyx/onyx-config.json", "content_changed": true}
+2026-09-16T20:24:21.793959012Z	INFO	CodeArts plugin installed for user	{"pluginDir": "/home/s1u1/.codeartsdoer/plugin"}
+2026-09-16T20:24:21.855308095Z	DEBUG	Scanner binary installed	{"path": "/home/s1u2/.codeartsdoer/plugin/onyx/onyx-scanner"}
+2026-09-16T20:24:21.855403559Z	DEBUG	Config file installed	{"path": "/home/s1u2/.codeartsdoer/plugin/onyx/onyx-config.json", "content_changed": true}
+2026-09-16T20:24:21.855480593Z	INFO	CodeArts plugin installed for user	{"pluginDir": "/home/s1u2/.codeartsdoer/plugin"}
+2026-09-16T20:24:21.855489369Z	DEBUG	Skipping user without CodeArts installed	{"homeDir": "/root"}
+2026-09-16T20:24:21.855492889Z	INFO	CodeArts plugin installation complete. Restart CodeArts for changes to take effect.
+📊 Installation summary:
+plugin_dir: /home/s1u1/.codeartsdoer/plugin, /home/s1u2/.codeartsdoer/plugin
+already_installed: false
+Installed:
+  - Guard plugin: ~/.codeartsdoer/plugin/onyx-guard.ts
+  - Scanner binary + config: ~/.codeartsdoer/plugin/onyx/
+
+CodeArts integration installed successfully!
+Restart CodeArts for changes to take effect.
+
+To update credentials, run: onyx-scanner install codearts --api-key=<new-key> --force
+2026-09-16T20:24:21.855506739Z	DEBUG	post_scan_skipped	{"event": "post_scan_skipped", "platform": "linux", "caller": "post-operation (codearts)", "reason": "missing_scan_credentials"}
+2026-09-16T20:24:21.855514263Z	INFO	CodeArts install command completed successfully
+
+================================================================================
+STEP B — PROOF: files chowned BACK to each target user (ls -ln; owner != 0)
+================================================================================
+---- s1u1 : /tmp/s1eval/home/s1u1/.codeartsdoer/plugin ----
+[top-level onyx-guard.ts]
+-rw-r--r-- 1 6001 6001 23849 Sep 16 20:24 /tmp/s1eval/home/s1u1/.codeartsdoer/plugin/onyx-guard.ts
+[onyx/ subtree: bundled scanner binary + onyx-config.json]
+total 38852
+-rw------- 1 6001 6001      214 Sep 16 20:24 onyx-config.json
+-rwxr-xr-x 1 6001 6001 39774200 Sep 16 20:24 onyx-scanner
+[onyx-config.json mode + owner]
+  mode=-rw------- (600)  owner_uid=6001 owner_gid=6001  /tmp/s1eval/home/s1u1/.codeartsdoer/plugin/onyx/onyx-config.json
+
+---- s1u2 : /tmp/s1eval/home/s1u2/.codeartsdoer/plugin ----
+[top-level onyx-guard.ts]
+-rw-r--r-- 1 6002 6002 23849 Sep 16 20:24 /tmp/s1eval/home/s1u2/.codeartsdoer/plugin/onyx-guard.ts
+[onyx/ subtree: bundled scanner binary + onyx-config.json]
+total 38848
+-rw------- 1 6002 6002      214 Sep 16 20:24 onyx-config.json
+-rwxr-xr-x 1 6002 6002 39774200 Sep 16 20:24 onyx-scanner
+[onyx-config.json mode + owner]
+  mode=-rw------- (600)  owner_uid=6002 owner_gid=6002  /tmp/s1eval/home/s1u2/.codeartsdoer/plugin/onyx/onyx-config.json
+
+================================================================================
+STEP C — onyx-config.json is 0600 AND readable BY ITS OWNER (setpriv drop to uid)
+================================================================================
+$ sudo setpriv --reuid 6001 --regid 6001 --clear-groups cat .../s1u1/.../onyx-config.json
+{
+  "api-key": "dummy_s1_key",
+  "endpoint-url": "https://ai-guard.example.invalid",
+  "timeout": "10s",
+  "verbose": true,
+  "block-prompts": "true",
+  "mcp-guard-hooks": true,
+  "hooks-runtime-protection": true
+}
+$ sudo setpriv --reuid 6002 --regid 6002 --clear-groups cat .../s1u2/.../onyx-config.json
+{
+  "api-key": "dummy_s1_key",
+  "endpoint-url": "https://ai-guard.example.invalid",
+  "timeout": "10s",
+  "verbose": true,
+  "block-prompts": "true",
+  "mcp-guard-hooks": true,
+  "hooks-runtime-protection": true
+}
+NEGATIVE CONTROL — non-owner (uid 6002) reading s1u1's 0600 config -> EACCES,
+confirming both the 0600 mode and that ownership was assigned PER user:
+$ sudo setpriv --reuid 6002 --regid 6002 --clear-groups cat .../s1u1/.../onyx-config.json
+cat: /tmp/s1eval/home/s1u1/.codeartsdoer/plugin/onyx/onyx-config.json: Permission denied
+
+================================================================================
+STEP D — chown failure log lines (chown_file_failed / chown_walk_failed / chown_node_failed)
+================================================================================
+NONE — every chown-back node succeeded (chownTreeToHomeDirOwner over onyx/ + chownNodesToHomeDirOwner over onyx-guard.ts).
+
+================================================================================
+SUMMARY OF PROOF
+================================================================================
+* 'Running as root, targeting all users {"userCount": 3}' — euid-0 all-users branch.
+* keychain_outcome loop iterated target_home_tail=s1u1(idx0)/s1u2(idx1)/root(idx2), total_targets=3.
+* 'CodeArts plugin installed for user' for /home/s1u1 and /home/s1u2; /root skipped (no CodeArts).
+* onyx-guard.ts + onyx/ (binary + config) owned by 6001:6001 (s1u1) and 6002:6002 (s1u2), NOT 0:0.
+* onyx-config.json mode 0600, readable by its owner uid, EACCES for the other user.
+* No chown_*_failed log lines: the chown-back branch ran cleanly on a real host.

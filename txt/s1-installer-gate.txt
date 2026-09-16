@@ -1,0 +1,68 @@
+==============================================================================
+EVIDENCE s1-installer-gate : onyx-scanner install codearts — skip/refresh/install decisions
+git commit: 290c2aa11563   scanner: /home/coder/.codeartsdoer/plugin/onyx/onyx-scanner
+date: 2026-09-16T19:22:54Z
+presence signal (installer): ~/.codeartsdoer/ exists AND a regular file at
+  ~/.codeartsdoer/installers/codearts (IsCodeArtsInstalled). Each case uses a
+  fresh temp HOME; guard endpoint UP = http://localhost:8080.
+==============================================================================
+
+########## (a) HOST WITH NO CodeArts PRESENT ##########
+$ HOME=<empty-temp> /home/coder/.codeartsdoer/plugin/onyx/onyx-scanner install codearts --endpoint http://localhost:8080 --api-key placeholder
+2026-09-16T19:22:54.364707568Z	INFO	Starting CodeArts installation
+2026-09-16T19:22:54.365702512Z	INFO	install_context	{"event": "install_context", "cycle_id": "0c18d975", "caller": "codearts_plugin", "platform": "linux", "parent_process_name": "timeout", "parent_pid": 1912094, "euid": 1001, "is_privileged_context": false, "active_console_sessions": 0}
+2026-09-16T19:22:54.365732242Z	INFO	Installing CodeArts integration
+2026-09-16T19:22:54.365745995Z	INFO	Starting CodeArts plugin installation
+2026-09-16T19:22:54.365811802Z	WARN	keychain_outcome	{"event": "keychain_outcome", "op": "put", "outcome": "fallback_env", "reason": "keychain_unavailable", "caller": "codearts_plugin", "cycle_id": "0c18d975", "platform": "linux", "target_home_set": true, "target_home_tail": "tmp.IADoRhdywQ", "target_index": 0, "total_targets": 1, "error": "exec: \"dbus-launch\": executable file not found in $PATH"}
+2026-09-16T19:22:54.365833975Z	INFO	No users with CodeArts installed found, nothing to do
+📊 Installation summary:
+already_installed: false
+Skipped: No users with CodeArts installed found
+2026-09-16T19:22:54.365847277Z	INFO	CodeArts installation skipped (No users with CodeArts installed found)
+exit=2
+DECISION: SKIP — no CodeArts install detected on the host.
+
+########## (b) PARTIAL / ALREADY-INSTALLED (run twice; then --force) ##########
+--- (b.1) FIRST run — CodeArts present, plugin absent => INSTALL ---
+$ HOME=<temp> /home/coder/.codeartsdoer/plugin/onyx/onyx-scanner install codearts --endpoint http://localhost:8080 --api-key K1
+2026-09-16T19:22:54.474148462Z	INFO	CodeArts plugin installation complete. Restart CodeArts for changes to take effect.
+📊 Installation summary:
+already_installed: false
+Installed:
+  - Guard plugin: ~/.codeartsdoer/plugin/onyx-guard.ts
+  - Scanner binary + config: ~/.codeartsdoer/plugin/onyx/
+CodeArts integration installed successfully!
+Restart CodeArts for changes to take effect.
+exit=0   DECISION: INSTALL (already_installed:false)
+
+--- (b.2) SECOND run, NO --force => ALREADY INSTALLED, SKIP ---
+$ HOME=<temp> /home/coder/.codeartsdoer/plugin/onyx/onyx-scanner install codearts --endpoint http://localhost:8080 --api-key K1
+📊 Installation summary:
+already_installed: true
+Skipped: CodeArts plugin already installed (use --force to overwrite)
+exit=2   DECISION: SKIP (already_installed:true; 'use --force to overwrite')
+
+--- (b.3) THIRD run, WITH --force => REFRESH / REINSTALL ---
+$ HOME=<temp> /home/coder/.codeartsdoer/plugin/onyx/onyx-scanner install codearts --endpoint http://localhost:8080 --api-key K1 --force
+📊 Installation summary:
+already_installed: true
+Installed:
+  - Guard plugin: ~/.codeartsdoer/plugin/onyx-guard.ts
+CodeArts integration installed successfully!
+exit=0   DECISION: REFRESH (already_installed:true but --force reinstalls)
+
+########## (c) GUARD ENDPOINT UNREACHABLE (dead port) with --guard-reachability-gate ##########
+$ HOME=<temp> /home/coder/.codeartsdoer/plugin/onyx/onyx-scanner install codearts --endpoint http://localhost:1 --api-key K1 --guard-reachability-gate --guard-reachability-timeout 2s
+2026-09-16T19:22:54.752093267Z	WARN	onyx guard unreachable from this context; skipping guard-integration install	{"event": "guard_reachability_skip", "platform": "linux", "agent": "codearts", "endpoint": "http://localhost:1", "outcome": "skip_unreachable"}
+📊 Installation summary:
+already_installed: false
+Skipped: onyx guard unreachable from this context
+2026-09-16T19:22:54.75212961Z	INFO	CodeArts installation skipped (onyx guard unreachable from this context)
+exit=2   DECISION: SKIP — guard unreachable; plugin NOT written.
+plugin tree after gate: 0 files (expect 0)
+
+==============================================================================
+GATE MATRIX (exit codes): (a) no-CodeArts => SKIP exit=2 | (b.1) install exit=0 |
+  (b.2) already-installed SKIP exit=2 | (b.3) --force REFRESH exit=0 |
+  (c) guard-unreachable SKIP exit=2. exit=0 only when the plugin is (re)written.
+==============================================================================

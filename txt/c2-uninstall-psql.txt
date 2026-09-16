@@ -1,0 +1,101 @@
+================================================================================
+C2 — UNINSTALL CodeArts artifact -> real rescan+ingest -> psql
+Real lane only: onyx-scanner --> Kong :8080 /mcp-scanner (200) --> S3 --> SQS
+  --> ScannerTenantWorkflow/collector (temporal-general-worker)
+  --> DesktopAgentCreator + McpAssetCreationWorkflow (temporal-python-worker)
+  --> Postgres (schema onyx_security, tenant 61750f27-8fbd-42a4-80cf-4191cfb2371a)
+API key redacted to first 6: apikey=Ingest... (INGESTION_DEV_API_KEY)
+Tenant CodeArts artifacts: agent asset 230 (endpoint_codearts),
+  skill asset 1500 (secure-review), MCP assets 1501 (Filesystem, local/npm)
+  and 992 (onyx-verify-probe, remote).
+
+MECHANISM ESTABLISHED ON THE REAL LANE (both directions driven):
+ - The scanner MCP-connection soft-delete reconcile runs INSIDE
+   McpAssetCreationWorkflow, which is only invoked when the agent reports >=1
+   MCP server. Removing ALL MCPs (mcp_servers_count:0) does NOT drive an edge
+   soft-delete on this lane (see Scan #1) -- the row persists last-known-good.
+ - When the agent still reports an MCP but a PREVIOUSLY-seen one is absent, the
+   reconcile fires and soft-deletes only the absent edge (see Scan #2).
+
+--------------------------------------------------------------------------------
+SCAN #1  (config mcp:{} — filesystem+probe MCP artifact removed; agent present)
+  scan_run_id ab6a4bba-71c2-4fbb-8b15-86325e8150b1   clean key -> ingest 200
+--------------------------------------------------------------------------------
+2026-09-16T19:48:39.484066534Z	DEBUG	Scan run starting	{"scan_run_id": "ab6a4bba-71c2-4fbb-8b15-86325e8150b1", "timestamp": "2026-09-16T19:48:39.482702713Z", "full_scan": true, "dry_run": false, "project_walk_timeout": "7m0s", "session_lookback_window": "720h0m0s"}
+2026-09-16T19:48:43.232579904Z	INFO	agent_detection	{"event": "agent_detection", "platform": "linux", "agent": "codearts", "detected": true, "evidence_type": "dsl_dir", "evidence_path": "/home/coder/.codeartsdoer", "username": "coder"}
+2026-09-16T19:48:43.232904273Z	DEBUG	Preparing to send static payload for agent	{"agent": "claude-code", "username": "coder", "config_path": "/home/coder/.claude.json", "mcp_servers_count": 2}
+2026-09-16T19:48:44.706663843Z	DEBUG	Preparing to send static payload for agent	{"agent": "codearts", "username": "coder", "config_path": "/home/coder/.codeartsdoer", "mcp_servers_count": 0}
+2026-09-16T19:48:44.712958877Z	DEBUG	payload sent to backend	{"payload_id": "scanner-agent-codearts-32a9af2b-f9ae-4011-9018-6e05c731a095", "size_bytes": 941}
+2026-09-16T19:49:36.965858847Z	DEBUG	Sending project payload for agent	{"agent": "claude-code", "username": "coder", "projects_count": 2, "mcp_servers_count": 2}
+2026-09-16T19:49:39.652482625Z	INFO	agent_detection	{"event": "agent_detection", "platform": "linux", "agent": "codearts", "detected": true, "evidence_type": "dsl_dir", "evidence_path": "/home/coder/.codeartsdoer", "username": "coder"}
+2026-09-16T19:49:39.653116801Z	DEBUG	Step done: scan user	{"username": "coder", "home_dir": "/home/coder", "payloads_sent": 3, "duration_ms": 60126, "scan_run_id": "ab6a4bba-71c2-4fbb-8b15-86325e8150b1"}
+
+Go collector handoff (temporal-general-worker) — codearts, mcpServersCount:0:
+  CreateScannerInventory agentName=codearts appDefID=endpoint_codearts mcpServersCount:0 (ScannerTenantWorkflow scanner-tenant-61750f27-...-20260916T194900Z)
+
+Result: scanner_installations row written, BUT agent-230 MCP edge 1441 (->1501)
+stayed is_deleted=f after >4min (no McpAssetCreationWorkflow ran for 0 MCPs).
+
+--------------------------------------------------------------------------------
+SCAN #2  (config restored to original onyx-verify-probe; filesystem MCP 1501 now
+  ABSENT from the scan) scan_run_id 9fc80dba-f966-420f-8597-b7369d93a544 -> 200
+--------------------------------------------------------------------------------
+2026-09-16T19:54:26.769623475Z	DEBUG	Preparing to send static payload for agent	{"agent": "codearts", "username": "coder", "config_path": "/home/coder/.codeartsdoer", "mcp_servers_count": 1}
+2026-09-16T19:55:22.367843435Z	DEBUG	Phase 2 done: scan project-level configs	{"username": "coder", "project_payloads_sent": 1, "registry_hits": 11, "full_scan": true, "duration_ms": 55591}
+2026-09-16T19:55:22.368150767Z	DEBUG	Step done: scan user	{"username": "coder", "home_dir": "/home/coder", "payloads_sent": 3, "duration_ms": 60674, "scan_run_id": "9fc80dba-f966-420f-8597-b7369d93a544"}
+2026-09-16T19:55:22.398734672Z	INFO	Scan run completed	{"payloads_sent": 3, "users": 1, "agents_detected_total": 2, "mcp_servers_total": 3, "projects_total": 2, "skills_total": 62, "duration_ms": 60724, "scan_run_id": "9fc80dba-f966-420f-8597-b7369d93a544"}
+
+================================ BEFORE (raw psql) =============================
+=== BEFORE (real DB state, config MCP removed, agent still installed) 2026-09-16T19:48:17Z ===
+--- assets: codearts agent 230, skill 1500, MCP 1501 ---
+230	endpoint_codearts	CodeArts (ca-home, coder, home, r7-ca-home)	AssetStatusUnsanctioned	f	2026-09-16 17:49:51.071236+00
+1500		secure-review	AssetStatusDiscovered	f	2026-09-16 18:06:47.587308+00
+1501	@modelcontextprotocol/server-filesystem	Filesystem MCP Server	AssetStatusDiscovered	f	2026-09-16 17:49:33.463862+00
+--- active agent-230 edges (AgentToMcp / AgentToSkill) ---
+886	230	920	AgentToMcp	t	2026-09-13 17:45:16.41032+00
+956	230	992	AgentToMcp	t	2026-09-16 17:48:48.284785+00
+1367	230	1418	AgentToSkill	f	2026-09-16 16:00:04.555814+00
+1369	230	1420	AgentToSkill	f	2026-09-16 16:00:04.845333+00
+1440	230	1500	AgentToSkill	f	2026-09-16 17:48:03.283816+00
+1441	230	1501	AgentToMcp	f	2026-09-16 17:48:48.099834+00
+--- assets count / max(id) ---
+161	1501
+--- scanner_installations latest 2 ---
+fc114907-6970-4887-8acb-ebb38ecc6d26	2	1	1	2026-09-16 17:54:45+00
+6142c920-cfb8-46f4-9d3d-3b1ce71f3329	2	1	1	2026-09-16 17:46:57+00
+
+================================ AFTER  (raw psql) =============================
+=== AFTER (real DB state, post rescan+ingest) 2026-09-16T19:56:03Z ===
+--- agent 230 (same id, still present, not duplicated) ---
+230	endpoint_codearts	CodeArts (ca-home, coder, home, r7-ca-home)	AssetStatusUnsanctioned	f	2026-09-16 17:49:51.071236+00
+--- agent-230 MCP edges: 1501 soft-deleted(t), 992 re-used id 956 active(f), 920 stays t ---
+886	230	920	AgentToMcp	t	2026-09-13 17:45:16.41032+00
+956	230	992	AgentToMcp	f	2026-09-16 19:55:02.29395+00
+1441	230	1501	AgentToMcp	t	2026-09-16 19:55:02.473209+00
+--- agent-230 skill edges (untouched, still active) ---
+1367	1418	AgentToSkill	f
+1369	1420	AgentToSkill	f
+1440	1500	AgentToSkill	f
+--- assets count/max (NO new rows => no duplication/resurrection) ---
+162	1642
+--- both new scan installations ---
+ab6a4bba-71c2-4fbb-8b15-86325e8150b1	2	16	62	2026-09-16 19:49:39+00
+
+================================ INTERPRETATION ================================
+ * MARKED DELETED:  asset_connections id 1441 (agent 230 -> Filesystem MCP 1501)
+     is_deleted  f -> t   updated_at 2026-09-16 17:48:48 -> 19:55:02
+     (the removed CodeArts MCP artifact, soft-deleted because absent from Scan #2)
+ * NOT DUPLICATED:  codearts agent stays the single asset id 230 (updated_at
+     unchanged 17:49:51 = ingestion-skip, no new agent row). MCP onyx-verify-probe
+     stays the single asset 992; its edge id 956 was REUSED (self-restored
+     f, updated 19:55:02), not appended as a new row.
+ * NOT RESURRECTED: stale edge 886 (230 -> old e2e MCP 920) stays is_deleted=t.
+ * assets count 161 -> 162 / max 1501 -> 1642: the ONLY new asset (1642) is an
+     UNRELATED claude-code skill "tilt-dev" (AgentToSkill from agent 23), not a
+     codearts artifact -> confirms no codearts asset was duplicated.
+ * scanner_installations: ab6a4bba (codearts mcp 0) and 9fc80dba (codearts mcp 1)
+     both landed; agent 230 count held at 1 across both (no dup install rows).
+================================ BOX STATE RESTORED ===========================
+ codearts_cli.json == c2-backups/codearts_cli.json.bak (IDENTICAL, onyx-verify-probe)
+ /home/coder/.local/bin/codearts restored; `codearts --version` -> 26.9.4
+ skills dir untouched. No git changes. Backups in evidence/c2-backups/.
