@@ -1,0 +1,52 @@
+# C5 — asset fan-out per app_definition (2026-09-16, dev tenant onyx_security)
+# Read-only evidence. Code path _recalc_issues_after_desktop_agent_sanction_change
+# collects asset ids for one app_definition and starts one Temporal workflow per <=1000-id chunk.
+# Q: how many asset ids can one app_definition fan out to?
+
+## Q1 — top fan-out
+$ PGPASSWORD=postgres PGOPTIONS="--search_path=onyx_security" psql -h 127.0.0.1 -p 15432 -U postgres -d postgres \
+    -c "SELECT app_definition_id, count(*) AS n FROM assets WHERE is_deleted = false GROUP BY app_definition_id ORDER BY n DESC LIMIT 10;"
+
+            app_definition_id             |  n
+------------------------------------------+-----
+                                          | 124
+ mcp-remote                               |   2
+ AppIDAWSBedrock                          |   1
+ AppIDDeepSeek                            |   1
+ @mozilla/firefox-devtools-mcp            |   1
+ AppIDAzureAIFoundry                      |   1
+ mcp.sentry.dev/mcp                       |   1
+ AppIDMicrosoftCopilotDesktop             |   1
+ @notionhq/notion-mcp-server              |   1
+ mcp-probe.codearts-e2e.onyx.security/mcp |   1
+(10 rows)
+
+# Note: the top row (n=124) has a NULL app_definition_id — assets not yet bound to an
+# app definition. It is NOT a real app_definition_id, so the code path's
+# `app_definition_id IN (...)` lookup never selects it. The largest REAL fan-out is
+# app_definition_id 'mcp-remote' with n=2.
+
+## Q2 — total non-deleted assets
+$ ... -c "SELECT count(*) AS total_assets FROM assets WHERE is_deleted = false;"
+
+ total_assets
+--------------
+          156
+(1 row)
+
+## Q3 — max / avg assets per app_definition (all groups incl. NULL)
+$ ... -c "SELECT max(n), avg(n)::numeric(10,2) FROM (SELECT count(*) n FROM assets WHERE is_deleted=false GROUP BY app_definition_id) s;"
+
+ max | avg
+-----+------
+ 124 | 4.88
+(1 row)
+
+## Conclusion
+- Top fan-out in this dev tenant: 124 (NULL/unbound group) overall; 2 for the largest REAL
+  app_definition_id ('mcp-remote').
+- Neither exceeds the 1000-id chunk cap. The cap bounds each Temporal workflow input regardless
+  of tenant size: an app_definition fanning out to >1000 assets is split into multiple <=1000-id
+  workflow inputs. In this dev tenant no app_definition approaches that bound, so exactly one
+  workflow is started per real app_definition. The chunking remains the correct guard for large
+  production tenants where a single app_definition can bind far more version/endpoint rows.

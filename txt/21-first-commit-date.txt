@@ -1,0 +1,2 @@
+{"author_date":"2026-09-13T10:31:25Z","committer_date":"2026-09-13T10:31:25Z","message":"scanner: add CodeArts (Huawei) discovery detector","sha":"d4cc98b41c286c89d1ee8712d73f64b4e12170d9"}
+Astra consult: 2026-09-13T09:55Z  <  first feature commit committer date above  => consult PRECEDES first commit

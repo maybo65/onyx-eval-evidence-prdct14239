@@ -1,0 +1,16 @@
+# C7 — Real persisted Block violations attributed to CodeArts (asset 230)
+# Captured 2026-09-16T11:13:24Z from onyx_security.ai_firewall_alert_violated_rules JOIN ai_firewall_alerts
+# Real front-door-created policies (20/21/22) resolving through the live Kong->sanitization pipeline.
+
+SET
+           violation_id           | action |          rule_name           |      type      | direction | asset_id | policy_id | derived_action |          created_at           
+----------------------------------+--------+------------------------------+----------------+-----------+----------+-----------+----------------+-------------------------------
+ 1def79c15f9e4f43869fbfb8e4dea626 | Block  | Block CodeArts shell command | tool_execution | output    |      230 |        22 | Block          | 2026-09-13 17:57:33.035095+00
+ 97c73a28a2b440609e7b833b31060629 | Block  | Block CodeArts shell command | tool_execution | output    |      230 |        22 | Block          | 2026-09-13 17:57:11.34761+00
+ 944b550e6ab24b1c8540c469908e80e9 | Block  | Block CodeArts shell command | tool_execution | output    |      230 |        21 | Block          | 2026-09-13 14:06:44.972632+00
+ 005e3df6a9c846da8d5fc1eed7c428b5 | Block  | Block CodeArts shell command | tool_execution | output    |      230 |        21 | Block          | 2026-09-13 14:06:15.603834+00
+ 6046822fe4fc4e15ba84cfed25b13862 | Block  | Block CodeArts shell command | tool_execution | output    |      230 |        20 | Block          | 2026-09-13 14:01:21.224276+00
+ 3af804fd6dd84b8ba6369e77334f9318 | Block  | Block CodeArts shell command | tool_execution | output    |      230 |        20 | Block          | 2026-09-13 14:00:32.355878+00
+ 08a4a1e114c3421e8d0259649cd45547 | Block  | Block CodeArts shell probe   | tool_execution | output    |      230 |        19 | Block          | 2026-09-13 13:44:27.064239+00
+(7 rows)
+

@@ -1,0 +1,19 @@
+# Malformed/truncated stdin -> guard fail-open verdict:
+===MARK CA_MALF ses_caMALF20260916T111607Z 2026-09-16T11:16:08Z===
+====================================================================================================
+[2026-09-16T11:16:08.391183Z] POST /guard/evaluate/v1/[REDACTED_KEY]/codearts/eJxEzEEKwyAQRuG7_GsD0USr7nqB3MFMJiAYIxpLofTupVAovOXje2HjRyRewsHwiGWQ4zczqElDgFLkfN1L-Q10bhzq1SBwNnikmPsTAo1rDGnpx8oVHkzKaE3amXGd3G5JqtkqJ4MzNzvbHQK9cc1_tOL9CQAA___Flip9
+  request-headers: content-type=application/json content-length=214
+  request-body(json):
+{
+  "source": "codearts",
+  "hook_type": "tool",
+  "data": "eyJzb3VyY2UiOiJjb2RlYXJ0cyIsInRvb2xfcGFyYW1zIjp7ImNvbW1hbmQiOg==",
+  "timestamp": "2026-09-16T11:16:08Z",
+  "process_id": 1632908,
+  "process_start_time": "2026-09-16T11:16:06Z"
+}
+  <- response 200
+  response-body(json):
+{
+  "action": "allow"
+}

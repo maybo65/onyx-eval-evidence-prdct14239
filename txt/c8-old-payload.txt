@@ -1,0 +1,15 @@
+HTTP/1.1 200 OK
+Content-Type: application/json
+Content-Length: 18
+Connection: keep-alive
+date: Wed, 16 Sep 2026 10:40:35 GMT
+server: uvicorn
+x-process-time: 0.014956866973079741
+Access-Control-Allow-Origin: *
+Access-Control-Expose-Headers: X-Auth-Token
+X-Kong-Upstream-Latency: 17
+X-Kong-Proxy-Latency: 0
+Via: 1.1 kong/3.9.3
+X-Kong-Request-Id: b324cf49f4795e43bf90534195069545
+
+{"action":"allow"}

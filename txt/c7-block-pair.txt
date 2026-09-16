@@ -1,0 +1,28 @@
+# Decoded request 'data' (raw stdin plugin payload, base64 in envelope):
+{"opencode_version": "0.4.2", "session_id": "ses_caBLOCK20260916T111709Zi3", "run_id": "run_caBLOCK202", "tool_call_id": "tc_caBLOCK202", "mcp_call_id": null, "tool_name": "bash", "tool_params": {"command": "echo onyx-codearts-runtime-guard-probe", "description": "e2e capture"}, "directory": "/home/coder/project", "worktree": "/home/coder/project"}
+
+# Raw tap capture (request envelope -> verdict):
+====================================================================================================
+[2026-09-16T11:17:09.237492Z] POST /guard/evaluate/v1/[REDACTED_KEY]/codearts/eJxEzUGqgzAURuG9_OMoGk1ektnbgHuI8QoXNMqNkULp3kuhUDjDA98TC92caIo7IYDPpu8-2UYPBgppY8rX_3l-h3QsFOUqULhJCh8ZAV07thoKR0HAxrk-oFBIOG5T3WcSBFDS1phkvO3mwa8u9Xp02vfR2z83uhUKtZDkHyN4vQMAAP__z2QvYw
+  request-headers: content-type=application/json content-length=618
+  request-body(json):
+{
+  "source": "codearts",
+  "hook_type": "tool",
+  "data": "eyJvcGVuY29kZV92ZXJzaW9uIjogIjAuNC4yIiwgInNlc3Npb25faWQiOiAic2VzX2NhQkxPQ0syMDI2MDkxNlQxMTE3MDlaaTMiLCAicnVuX2lkIjogInJ1bl9jYUJMT0NLMjAyIiwgInRvb2xfY2FsbF9pZCI6ICJ0Y19jYUJMT0NLMjAyIiwgIm1jcF9jYWxsX2lkIjogbnVsbCwgInRvb2xfbmFtZSI6ICJiYXNoIiwgInRvb2xfcGFyYW1zIjogeyJjb21tYW5kIjogImVjaG8gb255eC1jb2RlYXJ0cy1ydW50aW1lLWd1YXJkLXByb2JlIiwgImRlc2NyaXB0aW9uIjogImUyZSBjYXB0dXJlIn0sICJkaXJlY3RvcnkiOiAiL2hvbWUvY29kZXIvcHJvamVjdCIsICJ3b3JrdHJlZSI6ICIvaG9tZS9jb2Rlci9wcm9qZWN0In0=",
+  "timestamp": "2026-09-16T11:17:09Z",
+  "process_id": 1499849,
+  "process_start_time": "2026-09-16T09:39:18Z"
+}
+  <- response 200
+  response-body(json):
+{
+  "action": "block",
+  "block_reason": [
+    "Your request was blocked by Onyx AI Guard.\nViolated rules: Block CodeArts shell command\n\n[ONYX_VIOLATION_ID:e809f2a5982b4ab5b30a8f64f268246f]"
+  ],
+  "violated_rules": [
+    "Block CodeArts shell command"
+  ],
+  "block_rehydration_enabled": true
+}

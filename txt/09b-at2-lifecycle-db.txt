@@ -1,0 +1,41 @@
+at2 — MEDIUM unsanctioned-platform posture issue: behavior-over-time lifecycle
+=============================================================================
+Issue definition: id 94, identifier "unsanctioned-codearts-agent-deployed", severity 5.0
+  Medium band = severity in (3.3, 5.1]  ->  5.0 is Medium.  ✓
+Issue instance under test: id 41, asset 230 "Codearts (coder)", app_definition_id "endpoint_codearts"
+
+All state transitions below were driven through the REAL Onyx product UI (Frontegg SSO ->
+/ai-assets -> Status column -> Change status badge), no mocks, no hand-seeded rows. Each UI
+action fired the real PUT /api/crud/v1/access-control/bulk mutation; the resulting issue
+open/close was produced by the real IssueDetectionWorkflow recalc, then read back from Postgres.
+
+LIFECYCLE (single browser session, one instance id 41 throughout):
+
+  1. BASELINE (unsanctioned)      instance 41: OPEN   resolve_state=Open   asset.status=NULL
+     /posture-issues shows "Unsanctioned CodeArts Agent Deployed  Medium  Codearts (coder)  Open"
+
+  2. SANCTION via UI              PUT /access-control/bulk 200
+     req  {"updates":[{"app_definition_id":"endpoint_codearts","status":"Sanctioned"}]}
+     resp {"results":[{"app_definition_id":"endpoint_codearts","success":true,...}],"successful":1}
+     -> DB instance 41: CLOSED   resolve_state=IssueInstanceResolveStateClosed   (f = closed_at NOT null)
+     -> /posture-issues: issue CLEARED (row count 0)
+
+  3. UNSANCTION via UI            PUT /access-control/bulk 200
+     req  {"updates":[{"app_definition_id":"endpoint_codearts","status":"Unsanctioned"}]}
+     resp {"results":[{"app_definition_id":"endpoint_codearts","success":true,...}],"successful":1}
+     -> DB instance 41: RE-OPENED (SAME id 41)  resolve_state=IssueInstanceResolveStateOpen
+     -> /posture-issues: issue OPEN again, Medium
+
+FINAL DB READ-BACK (current, honest end state = unsanctioned/open):
+
+ instance_id | issue_definition_id | severity | open |         resolve_state         | asset_id |       name       |         status
+-------------+---------------------+----------+------+-------------------------------+----------+------------------+-------------------------
+          41 |                  94 |        5 | t    | IssueInstanceResolveStateOpen |      230 | Codearts (coder) | AssetStatusUnsanctioned
+
+Proof: the SAME issue instance (id 41) opened while unsanctioned, closed when sanctioned through
+the real product UI, and re-opened (same id) when unsanctioned again. Matcher rule verified:
+an asset is unsanctioned iff status != SANCTIONED (NULL and AssetStatusUnsanctioned both -> open).
+
+Screenshots: 07 (open+Medium), 08 (before sanction), 09 (sanctioned), 10 (cleared), 10b (reopened).
+Network:     09-at2-sanction-network.json  (both bulk PUTs, captured from the browser).
+Recording:   recordings/at2.trace.zip, recordings/at2.webm  (whole session).

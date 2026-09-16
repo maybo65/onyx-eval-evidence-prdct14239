@@ -1,0 +1,60 @@
+# C6 — IssueDetectionWorkflowInput serialized payload size (real Temporal event history)
+# Read-only evidence: the actual WorkflowExecutionStarted input of a REAL
+# desktop-agent sanction recalc run, decoded from Temporal event history.
+# No fabricated numbers — every byte count below is measured off the wire.
+
+## The payload model (schema table source)
+File: backend_python/src/python_temporal_worker/issue_detection/models.py:8
+  class IssueDetectionWorkflowInput(BaseModel):
+      asset_ids: list[int]          # Field 1 — the recalc scope, ONE chunk of <=1000 ids
+      platform_tenant: TenantModel  # Field 2 — {ID:int, Name:str, SchemaName:str, UUID:str}
+
+The recalc path (_recalc_issues_after_desktop_agent_sanction_change) collects the
+app_definition's asset ids and starts ONE IssueDetectionWorkflow per <=1000-id chunk
+(MAX_ASSET_IDS_PER_RECALC_WORKFLOW = 1000). So the ONLY field that grows with tenant
+size is asset_ids, and it is hard-capped at 1000 ints per workflow input.
+
+## Real serialized payload (decoded from Temporal, NOT reconstructed)
+$ kubectl -n onyxd exec deploy/onyx-temporal-admintools -- temporal workflow show \
+    --namespace default \
+    --workflow-id "desktop-agent-sanction-recalc-onyx_security-a0eaec5a55dc2f5b-0" \
+    --output json
+# -> WorkflowExecutionStarted.input.payloads[0]:
+
+  workflowType : IssueDetectionWorkflow
+  metadata     : {"encoding": "json/plain"}
+  serialized   : 144 bytes
+  body         : {"asset_ids":[230],"platform_tenant":{"ID":1,"Name":"Onyx Security",
+                  "SchemaName":"onyx_security","UUID":"61750f27-8fbd-42a4-80cf-4191cfb2371a"}}
+
+This is one real recalc chunk: asset_ids has 1 id (230) and the payload serialized to
+144 bytes on the wire (Temporal's own event-history byte count, json/plain encoding).
+
+## Worst-case byte arithmetic for a FULL 1000-id chunk
+Decompose the 144-byte real payload:
+  - envelope + tenant block (everything except the ids):
+      {"asset_ids":[]  ,"platform_tenant":{"ID":1,"Name":"Onyx Security",
+      "SchemaName":"onyx_security","UUID":"61750f27-8fbd-42a4-80cf-4191cfb2371a"}}
+    = 144 - len("230") = 144 - 3 = 141 bytes fixed overhead for THIS tenant.
+    (Tenant name/schema are bounded: a schema name is <=63 chars; even a maximal
+     tenant block stays a small fixed constant, ~250 bytes.)
+  - each additional id adds len(str(id)) + 1 (the comma). asset ids are bigint (int64)
+    serial keys.
+
+Bounds for the capped 1000-id chunk (the maximum a single workflow input can carry):
+  - realistic prod ids (8 digits): 1000 * (8 + 1) - 1 = 8,999 bytes of ids
+      total ~ 141 + 8,999 = ~9.1 KB
+  - theoretical int64 max (19 digits, 9223372036854775807): 1000 * (19 + 1) - 1 = 19,999
+      total ~ 141 + 19,999 = ~20 KB
+
+## Bound vs the Temporal payload cap
+Temporal's single-payload gRPC limit is 2 MB (2,097,152 bytes). The worst-case FULL
+1000-id chunk is ~20 KB even with maximal int64 ids and a maximal tenant block — two
+orders of magnitude under the cap. The 1000-id chunk cap (MAX_ASSET_IDS_PER_RECALC_WORKFLOW)
+is what keeps this bounded: an app_definition binding more than 1000 assets is split
+into multiple <=1000-id workflow inputs, so no single IssueDetectionWorkflow input can
+ever approach the 2 MB boundary regardless of tenant size.
+
+# Verdict: the recalc workflow input is bounded to ~20 KB worst case (measured base
+# 144 bytes for 1 id + linear per-id growth to the 1000-id cap), safely under Temporal's
+# 2 MB payload limit. No unbounded payload crosses the workflow boundary.

@@ -1,0 +1,21 @@
+# Decoded request 'data' (raw stdin plugin payload, base64 in envelope):
+{"opencode_version": "0.4.2", "session_id": "ses_ocALLOW20260916T111607Z", "run_id": "run_ocALLOW202", "tool_call_id": "tc_ocALLOW202", "mcp_call_id": null, "tool_name": "bash", "tool_params": {"command": "ls -la /home/coder/project", "description": "e2e capture"}, "directory": "/home/coder/project", "worktree": "/home/coder/project"}
+
+# Raw tap capture (request envelope -> verdict):
+====================================================================================================
+[2026-09-16T11:16:09.494410Z] POST /guard/evaluate/v1/[REDACTED_KEY]/opencode/eJwszUGqgzAURuG9_OMoGk1ektnbgHvQ6xUuaBKSKoXSvRdp4QwPfC-sfAnxNB-MAMlN393ZRg8GCrQLx8d_zr8hZY6UVobCxaVKigjo2rHVUEgVAbvE8wmFykXmfTqPhQsCmLQ1hoy33TL4zVGvR6d9P3v750a3QeGsXOKXuYmC9ycAAP__zJ8vWw
+  request-headers: content-type=application/json content-length=598
+  request-body(json):
+{
+  "source": "opencode",
+  "hook_type": "tool",
+  "data": "eyJvcGVuY29kZV92ZXJzaW9uIjogIjAuNC4yIiwgInNlc3Npb25faWQiOiAic2VzX29jQUxMT1cyMDI2MDkxNlQxMTE2MDdaIiwgInJ1bl9pZCI6ICJydW5fb2NBTExPVzIwMiIsICJ0b29sX2NhbGxfaWQiOiAidGNfb2NBTExPVzIwMiIsICJtY3BfY2FsbF9pZCI6IG51bGwsICJ0b29sX25hbWUiOiAiYmFzaCIsICJ0b29sX3BhcmFtcyI6IHsiY29tbWFuZCI6ICJscyAtbGEgL2hvbWUvY29kZXIvcHJvamVjdCIsICJkZXNjcmlwdGlvbiI6ICJlMmUgY2FwdHVyZSJ9LCAiZGlyZWN0b3J5IjogIi9ob21lL2NvZGVyL3Byb2plY3QiLCAid29ya3RyZWUiOiAiL2hvbWUvY29kZXIvcHJvamVjdCJ9",
+  "timestamp": "2026-09-16T11:16:09Z",
+  "process_id": 1632908,
+  "process_start_time": "2026-09-16T11:16:06Z"
+}
+  <- response 200
+  response-body(json):
+{
+  "action": "allow"
+}

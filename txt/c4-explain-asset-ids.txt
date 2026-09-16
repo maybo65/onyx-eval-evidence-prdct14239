@@ -1,0 +1,52 @@
+# C4 — EXPLAIN ANALYZE of the asset-id lookup (2026-09-16, dev tenant onyx_security)
+# Read-only evidence (EXPLAIN ANALYZE on a SELECT).
+
+## Repository function
+File: /home/coder/onyx/backend_python/src/common/repository/asset.py:301
+  async def get_asset_ids_by_app_definition_ids(self, app_definition_ids: list[str]) -> list[int]
+
+Real SQL issued (SQLAlchemy, asset.py:312-315):
+  select(Asset.id).where(
+      Asset.app_definition_id.in_(app_definition_ids),
+      Asset.is_deleted == False,
+  )
+=> SELECT id FROM assets WHERE app_definition_id IN (...) AND is_deleted = false;
+Selected column: id. Filters: app_definition_id IN (...) AND is_deleted = false.
+
+## EXPLAIN ANALYZE
+# Real app_definition_id chosen from C5 top fan-out that returns rows: 'mcp-remote'.
+$ PGPASSWORD=postgres PGOPTIONS="--search_path=onyx_security" psql -h 127.0.0.1 -p 15432 -U postgres -d postgres \
+    -c "EXPLAIN (ANALYZE, BUFFERS) SELECT id FROM assets WHERE app_definition_id IN ('mcp-remote') AND is_deleted = false;"
+
+                                                           QUERY PLAN
+--------------------------------------------------------------------------------------------------------------------------------
+ Bitmap Heap Scan on assets  (cost=4.16..10.24 rows=2 width=8) (actual time=0.039..0.045 rows=2 loops=1)
+   Recheck Cond: ((app_definition_id)::text = 'mcp-remote'::text)
+   Filter: (NOT is_deleted)
+   Heap Blocks: exact=4
+   Buffers: shared hit=5
+   ->  Bitmap Index Scan on asset_app_definition_id  (cost=0.00..4.16 rows=2 width=0) (actual time=0.015..0.016 rows=5 loops=1)
+         Index Cond: ((app_definition_id)::text = 'mcp-remote'::text)
+         Buffers: shared hit=1
+ Planning:
+   Buffers: shared hit=323
+ Planning Time: 0.836 ms
+ Execution Time: 0.075 ms
+(12 rows)
+
+# Verdict: INDEX-backed. The planner uses a Bitmap Index Scan on the app_definition_id btree
+# index `asset_app_definition_id` (Index Cond on app_definition_id), then a Bitmap Heap Scan
+# applying the is_deleted filter — NOT a Seq Scan. is_deleted is applied as a heap Filter.
+
+## Relevant indexes
+$ ... -c "SELECT indexname, indexdef FROM pg_indexes WHERE tablename='assets' AND indexdef ILIKE '%app_definition_id%';"
+
+           indexname            |                                                                                     indexdef
+--------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ asset_app_definition_id        | CREATE INDEX asset_app_definition_id ON onyx_security.assets USING btree (app_definition_id)
+ asset_type_app_definition_id   | CREATE INDEX asset_type_app_definition_id ON onyx_security.assets USING btree (type, app_definition_id) WHERE (app_definition_id IS NOT NULL)
+ assets_effective_group_key     | CREATE INDEX assets_effective_group_key ON onyx_security.assets USING btree (COALESCE(group_key, app_definition_id))
+ ix_assets_capability_histogram | CREATE INDEX ix_assets_capability_histogram ON onyx_security.assets USING btree (app_definition_id, type, sub_type) WHERE ((is_deleted = false) AND (awaiting_discovery = false))
+(4 rows)
+
+# The lookup is served by `asset_app_definition_id` (btree on app_definition_id).

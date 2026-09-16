@@ -1,0 +1,14 @@
+# C7 — PUT /access-control/bulk refuses unauthenticated / malformed requests
+# Captured 2026-09-16T11:18:51Z against the real Kong gateway (localhost:8080) — negative/guard proof.
+
+## 1) No credential (no bearer) -> expect 401
+### http://localhost:8080/api/crud/v1/access-control/bulk
+HTTP 401
+### http://localhost:8181/api/crud/v1/access-control/bulk
+HTTP 401
+
+## 2) No credential, empty body -> expect 401 (auth checked before body)
+HTTP 401
+
+## response body (no-auth) for the record:
+{"error": "Authentication required"}

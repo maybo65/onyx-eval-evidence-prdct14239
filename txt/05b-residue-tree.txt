@@ -1,0 +1,106 @@
+# 05b — CodeArts residue AFTER uninstall (binary removed from PATH), proving the residue was real and intact,
+# alongside the scanner log line showing the codearts detector evaluated the dir and DECLINED to emit.
+# The detector is PATH-gated (BinaryOnPathForUser("codearts")) so leftover config residue alone is NOT reported as an install.
+
+## $ which codearts   (binary NOT on PATH after uninstall)
+codearts: not found (not on PATH)
+
+## $ ls -laR ~/.codeartsdoer   (residue directory still present + intact)
+/home/coder/.codeartsdoer:
+total 60
+drwxr-xr-x 10 coder coder 4096 Sep 13 12:39 .
+drwxr-x--- 30 coder coder 4096 Sep 13 11:28 ..
+drwxr-xr-x  5 coder coder 4096 Sep 13 11:30 agent-team
+drwxr-xr-x  7 coder coder 4096 Sep 13 11:30 cli-data
+-rw-r--r--  1 coder coder   66 Sep 13 10:46 codearts_cli.json
+drwx------  2 coder coder 4096 Sep 13 09:23 generative-ui
+-rw-r--r--  1 coder coder   63 Sep 13 10:39 .gitignore
+-rw-r--r--  1 coder coder  578 Sep 13 10:39 history-snip.jsonc
+drwxr-xr-x  3 coder coder 4096 Sep 13 09:23 installers
+-rw-------  1 coder coder  183 Sep 13 10:39 mem-exp-config.json
+drwxr-xr-x  4 coder coder 4096 Sep 13 12:39 memory
+-rw-r--r--  1 coder coder   63 Sep 13 14:07 package.json
+drwxr-xr-x  3 coder coder 4096 Sep 13 12:39 plugin
+drwxr-xr-x  3 coder coder 4096 Sep 13 10:39 sandbox_runner
+drwxr-xr-x  2 coder coder 4096 Sep 13 10:39 skills
+
+/home/coder/.codeartsdoer/agent-team:
+total 20
+drwxr-xr-x  5 coder coder 4096 Sep 13 11:30 .
+drwxr-xr-x 10 coder coder 4096 Sep 13 12:39 ..
+drwxr-xr-x  2 coder coder 4096 Sep 13 11:30 log
+drwxr-xr-x  2 coder coder 4096 Sep 13 10:39 roles
+drwxr-xr-x  2 coder coder 4096 Sep 13 10:39 scene
+
+/home/coder/.codeartsdoer/agent-team/log:
+total 8
+drwxr-xr-x 2 coder coder 4096 Sep 13 11:30 .
+drwxr-xr-x 5 coder coder 4096 Sep 13 11:30 ..
+
+/home/coder/.codeartsdoer/agent-team/roles:
+total 8
+drwxr-xr-x 2 coder coder 4096 Sep 13 10:39 .
+drwxr-xr-x 5 coder coder 4096 Sep 13 11:30 ..
+
+/home/coder/.codeartsdoer/agent-team/scene:
+total 8
+drwxr-xr-x 2 coder coder 4096 Sep 13 10:39 .
+drwxr-xr-x 5 coder coder 4096 Sep 13 11:30 ..
+
+/home/coder/.codeartsdoer/cli-data:
+total 752
+drwxr-xr-x  7 coder coder   4096 Sep 13 11:30 .
+drwxr-xr-x 10 coder coder   4096 Sep 13 12:39 ..
+drwxr-xr-x  5 coder coder   4096 Sep 13 12:38 checkpoint
+drwxr-xr-x  2 coder coder   4096 Sep 13 10:39 cron
+drwxr-xr-x  2 coder coder   4096 Sep 13 13:50 log
+-rw-r--r--  1 coder coder 262144 Sep 13 14:07 opencode.db
+-rw-r--r--  1 coder coder  32768 Sep 13 14:07 opencode.db-shm
+-rw-r--r--  1 coder coder 440872 Sep 13 14:07 opencode.db-wal
+-rw-------  1 coder coder     99 Sep 13 09:24 settings.json
+drwxr-xr-x  5 coder coder   4096 Sep 13 11:30 storage
+drwxr-xr-x  3 coder coder   4096 Sep 13 10:39 system
+
+/home/coder/.codeartsdoer/cli-data/checkpoint:
+total 20
+drwxr-xr-x 5 coder coder 4096 Sep 13 12:38 .
+drwxr-xr-x 7 coder coder 4096 Sep 13 11:30 ..
+drwxr-xr-x 4 coder coder 4096 Sep 13 10:39 checkpoint_0dfa9e81064efda6
+drwxr-xr-x 4 coder coder 4096 Sep 13 12:38 checkpoint_f4c66d2a4e5e4268
+drwxr-xr-x 4 coder coder 4096 Sep 13 10:46 checkpoint_f88c7ad2498119b0
+
+/home/coder/.codeartsdoer/cli-data/checkpoint/checkpoint_0dfa9e81064efda6:
+total 20
+drwxr-xr-x 4 coder coder 4096 Sep 13 10:39 .
+drwxr-xr-x 5 coder coder 4096 Sep 13 12:38 ..
+-rw-r--r-- 1 coder coder  106 Sep 13 10:39 config.json
+drwxr-xr-x 2 coder coder 4096 Sep 13 10:39 data
+drwxr-xr-x 2 coder coder 4096 Sep 13 10:39 objects
+
+/home/coder/.codeartsdoer/cli-data/checkpoint/checkpoint_0dfa9e81064efda6/data:
+total 8
+drwxr-xr-x 2 coder coder 4096 Sep 13 10:39 .
+drwxr-xr-x 4 coder coder 4096 Sep 13 10:39 ..
+
+/home/coder/.codeartsdoer/cli-data/checkpoint/checkpoint_0dfa9e81064efda6/objects:
+total 8
+drwxr-xr-x 2 coder coder 4096 Sep 13 10:39 .
+drwxr-xr-x 4 coder coder 4096 Sep 13 10:39 ..
+
+## retained auth-bearing settings content (~/.codeartsdoer/cli-data/settings.json)
+-- ls -la --
+-rw------- 1 coder coder 99 Sep 13 09:24 /home/coder/.codeartsdoer/cli-data/settings.json
+-- content --
+{
+  "security": {
+    "folderTrust": {
+      "enabled": false
+    },
+    "trustedFolders": []
+  }
+}
+## scanner log line — codearts detector evaluated this home and DECLINED (outcome=not_installed) because the binary is off PATH:
+2026-09-13T10:27:33.48309777Z	DEBUG	Detector scanned	{"detector": "codearts", "username": "coder", "outcome": "not_installed", "paths_checked": [], "instances": [], "mcp_servers_total": 0, "duration_ms": 0}
+
+## and the codearts detector is listed under detectors_skipped_not_detected in the same residue scan (contrast: the positive scan detected it):
+detectors_skipped_not_detected": ["lm_studio", "anythingllm", "aider", "amazon-q-developer-cli", "claude-engineer", "claw-code", "cline", "devika", "fastclaw", 
