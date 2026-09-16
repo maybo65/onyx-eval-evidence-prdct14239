@@ -1,0 +1,163 @@
+C14 — COMPLETE user-facing string inventory (codearts_install.go + codearts_uninstall.go)
+Commit: 290c2aa11563d0c5325995c2b77236065be6cb36
+Captured (UTC): 2026-09-16 21:23:32
+`git rev-parse HEAD` output: 290c2aa11563d0c5325995c2b77236065be6cb36
+(HEAD matches the target commit exactly — confirmed before reading either file.)
+
+Method: read both files in full at head, then grep -nE '"' over each file and
+classified every match. Every string below was cross-checked against
+scanner/cmd/opencode_install.go and scanner/cmd/opencode_uninstall.go (also read
+in full at head) for BYTE-IDENTICAL matches. No string in either file is
+ticket-sourced — the ticket specifies behavior only, never wording — so every
+row's Source is either "invented" or "byte-identical to OpenCode". Where a
+string is a close template match to OpenCode's but NOT byte-identical (e.g. the
+same sentence with the product name or a path substituted), it is still scored
+"invented" per the two-way taxonomy, with a note explaining the near-match so
+the reviewer isn't misled into thinking it's coincidental.
+
+Excluded from the tables below (not prose/messages the user reads, so out of
+scope for a "user-facing string" audit): bare env-var lookup keys passed as the
+second argument to common.GetStringFromFlagOrEnv — ONYX_INGEST_API_KEY,
+ONYX_INGEST_ENDPOINT, ONYX_API_KEY, ONYX_AI_GUARD_ENDPOINT (install.go);
+ONYX_INGEST_API_KEY, ONYX_INGEST_ENDPOINT (uninstall.go) — and the bare default
+URL literal "https://ai-guard.onyx.security" assigned to a variable at
+install.go:79 (it does reach the user, but only as a substring already counted
+inside the --endpoint flag help row below). Import path strings are excluded as
+non-prose.
+
+================================================================================
+TABLE 1 — scanner/cmd/codearts_install.go
+================================================================================
+
+| String | Line | Source |
+|---|---|---|
+| `codearts` (cobra `Use`) | 28 | invented (agent name; opencode_install.go:30 `Use: "opencode"` — not comparable, different agent) |
+| `Install integration for CodeArts with AI Guard` (Short) | 29 | invented (template shared with opencode_install.go:31 `Install integration for OpenCode with AI Guard`, but not byte-identical — product name differs) |
+| `Install Huawei Cloud CodeArts integration with the Onyx AI Guard.` (Long, para 1) | 30 | invented (opencode_install.go:32 `Install OpenCode integration with the Onyx AI Guard.` — same slot, not identical) |
+| `CodeArts (the "codearts" CLI) is a branded distribution derived from OpenCode and` (Long) | 32 | invented (unique to codearts; no opencode counterpart) |
+| `ships OpenCode's plugin runtime verbatim, so this command installs the same guard` (Long) | 33 | invented (unique) |
+| `plugin OpenCode uses — the only difference is CodeArts's config home. It installs a` (Long) | 34 | invented (unique) |
+| `guard plugin at ~/.codeartsdoer/plugin/onyx-guard.ts that intercepts tool calls` (Long) | 35 | invented (unique) |
+| `(blocked by throwing) and audits/blocks prompts — the feature-parity analog of` (Long) | 36 | invented (unique) |
+| `Claude Code hooks. CodeArts has a single integration mechanism (the plugin); there` (Long) | 37 | invented (unique) |
+| `is no base-URL lane.` (Long) | 38 | invented (unique) |
+| `When running as root (sudo), the plugin is installed for all users on the machine.` (Long) | 40 | invented (near-identical wording to opencode_install.go:52-53 `When running as root (sudo), the integration is installed for all users on the / machine.` — word "plugin" vs "integration" and different line-wrap, NOT byte-identical) |
+| `Otherwise, it is installed only for the current user.` (Long) | 41 | invented (same sentence appears fused into opencode_install.go:53 `machine. Otherwise, it is installed only for the current user.` but the line boundary differs, so NOT byte-identical as a whole line) |
+| `Running this command multiple times is safe - it will detect an existing` (Long) | 43 | **byte-identical to opencode_install.go:55** |
+| `installation and skip unless --force is used.` (Long) | 44 | **byte-identical to opencode_install.go:56** |
+| `Use --dry-run to preview changes without applying them.` (Long) | 46 | **byte-identical to opencode_install.go:58** |
+| `Use --force to overwrite an existing installation.` (Long) | 47 | **byte-identical to opencode_install.go:59** |
+| `Starting CodeArts installation` (logger.Info) | 68 | invented (opencode_install.go:73 uses `logger.Infow("Starting OpenCode installation", "integration_type", ...)` — different call shape and text) |
+| `API key is required for installation` (logger.Error) | 73 | **byte-identical to opencode_install.go:78** |
+| `--api-key is required` (fmt.Errorf) | 74 | **byte-identical to opencode_install.go:79** |
+| `codearts_install_flags: dry_run=%v, verbose=%v, force=%v, endpoint=%v` (logger.Debugf) | 82-83 | invented (opencode_install.go:91-92 is `opencode_install_flags: dry_run=%v, verbose=%v, force=%v, endpoint=%v, provider=%v, integration_type=%v` — shares the first four fields' prefix pattern but is a longer, distinct format string; NOT byte-identical) |
+| `codearts_plugin` (install-context caller tag, passed to installer.LogInstallContext) | 97 | invented (opencode_install.go:112-115 uses `"opencode_install"` / `"opencode_base_url"` depending on topology — neither matches) |
+| `Installing CodeArts integration` (logger.Info) | 131 | invented (opencode_install.go:148 uses `logger.Infow("Installing OpenCode integration", "type", ...)` — different call shape and text) |
+| `Installation failed: %v` (logger.Errorf) | 134 | **byte-identical to opencode_install.go:151** |
+| `installation failed: %w` (fmt.Errorf) | 135 | **byte-identical to opencode_install.go:152** |
+| `installation completed with %d error(s)` (fmt.Errorf) | 146 | **byte-identical to opencode_install.go:163** |
+| `installation skipped` (default SkipReason fallback) | 151 | **byte-identical to opencode_install.go:167-168** |
+| `CodeArts installation skipped (%s)` (logger.Infof) | 153 | invented (opencode_install.go:170 is `OpenCode installation skipped (%s)` — same template, product name differs) |
+| `installation skipped: %s` (fmt.Sprintf, ExitCodeError.Msg) | 156 | **byte-identical to opencode_install.go:173** |
+| `CodeArts install command completed successfully` (logger.Info) | 159 | invented (opencode_install.go:176 is `OpenCode install command completed successfully` — same template, product name differs) |
+| `--dry-run` help: `Show what would be changed without applying modifications` | 167 | **byte-identical to opencode_install.go:184** |
+| `--verbose` help: `Enable verbose output` | 168 | **byte-identical to opencode_install.go:185** |
+| `--force` help: `Force overwrite of existing plugin installation` | 169 | invented (opencode_install.go:186 is `Force overwrite of existing OpenCode configuration` — NOT identical: "plugin installation" vs "OpenCode configuration") |
+| `--api-key` help: `API key for authentication (required). Env - ONYX_API_KEY` | 170 | **byte-identical to opencode_install.go:187** |
+| `--endpoint` help: `Custom endpoint URL (default: https://ai-guard.onyx.security). Env - ONYX_AI_GUARD_ENDPOINT` | 171 | **byte-identical to opencode_install.go:188** |
+| `--block-prompts` help: `Block flagged prompts instead of audit-only (true/false, default: true)` | 172 | invented (opencode_install.go:191 is `For the plugin: block flagged prompts instead of audit-only (true/false, default: true)` — opencode has an extra "For the plugin: " prefix; NOT byte-identical) |
+| `--scan-endpoint` help: `Ingest endpoint for post-operation scan (optional)` | 173 | **byte-identical to opencode_install.go:192** |
+| `--scan-api-key` help: `API key for post-operation scan (optional)` | 174 | **byte-identical to opencode_install.go:193** |
+| `📊 Dry run summary:` | 188 | **byte-identical to opencode_install.go:276** |
+| `📊 Installation summary:` | 190 | **byte-identical to opencode_install.go:278** |
+| `plugin_dir: %s\n` (fmt.Printf) | 194 | invented (opencode_install.go:282 uses key `config_file: %s\n` — different key name, NOT identical) |
+| `already_installed: %v\n` (fmt.Printf) | 196 | invented (opencode_install.go:285 uses key `file_existed: %v\n` — different key name, NOT identical) |
+| `Would install:` | 200 | **byte-identical to opencode_install.go:295** |
+| `  - Guard plugin: ~/.codeartsdoer/plugin/onyx-guard.ts (tool.execute.before block + chat.message audit)` | 201 | invented (near-identical to opencode_install.go:297 `  - Guard plugin: ~/.config/opencode/plugin/onyx-guard.ts (tool.execute.before block + chat.message audit)` — differs ONLY in the path substring `.codeartsdoer/plugin` vs `.config/opencode/plugin`; NOT byte-identical) — **this is one of the verifier's flagged-missing lines; confirmed present verbatim as quoted** |
+| `  - Scanner binary and config` | 202 | invented — **no opencode counterpart exists at all**: opencode_install.go's dry-run branch (lines 294-302) has no analogous "scanner binary" bullet; that phrase only appears in opencode's non-dry-run branch with different wording (see next row). This is the codearts-only dry-run bullet the verifier asked about. |
+| `Run without --dry-run to apply these changes.` | 203 | **byte-identical to opencode_install.go:302** (also byte-identical to opencode_uninstall.go:159 and codearts_uninstall.go:129) |
+| `Installed:` | 205 | **byte-identical to opencode_install.go:304** |
+| `  - Guard plugin: ~/.codeartsdoer/plugin/onyx-guard.ts` | 206 | invented (near-identical to opencode_install.go:306 `  - Guard plugin: ~/.config/opencode/plugin/onyx-guard.ts` — differs only in path substring; NOT byte-identical) |
+| `  - Scanner binary + config: ~/.codeartsdoer/plugin/onyx/` | 207 | invented (near-identical to opencode_install.go:307 `  - Scanner binary + config: ~/.config/opencode/plugin/onyx/` — differs only in path substring; NOT byte-identical) — **this is the verifier's flagged "Scanner binary + config" line; confirmed present verbatim as quoted** |
+| `CodeArts integration installed successfully!` | 209 | invented (opencode_install.go:314 is `OpenCode integration installed successfully!` — product name differs) |
+| `Restart CodeArts for changes to take effect.` | 210 | invented (opencode_install.go:315 is `Restart OpenCode for changes to take effect.` — product name differs) |
+| `To update credentials, run: onyx-scanner install codearts --api-key=<new-key> --force` | 212 | invented (opencode_install.go:317 is `To update credentials, run: onyx-scanner install opencode --integration-type=%s --api-key=<new-key> --force\n` — codearts drops the `--integration-type=%s` segment since it has no such flag; NOT byte-identical) |
+| `no changes needed` (default SkipReason fallback) | 217 | **byte-identical to opencode_install.go:321-322** |
+| `Skipped: %s\n` (fmt.Printf) | 219 | **byte-identical to opencode_install.go:324** — **this is the verifier's flagged "Skipped: <reason>" line; actual text is the format string `Skipped: %s\n`, confirmed present** |
+| `No changes needed` | 221 | **byte-identical to opencode_install.go:326** — **verifier's flagged "No changes needed" line; confirmed present verbatim** |
+| `Encountered errors during installation:` (fmt.Println) | 225 | **byte-identical to opencode_install.go:330** |
+| `Encountered errors during installation:` (logger.Warn) | 226 | **byte-identical to opencode_install.go:331** |
+| `   error: %v\n` (fmt.Printf) | 228 | **byte-identical to opencode_install.go:333** — **verifier's flagged "   error: %v" line; confirmed present verbatim (three leading spaces + trailing \n)** |
+| `error: %v` (logger.Errorf) | 229 | **byte-identical to opencode_install.go:334** |
+
+install.go totals: 56 strings inventoried — 27 byte-identical to OpenCode, 29 invented.
+
+================================================================================
+TABLE 2 — scanner/cmd/codearts_uninstall.go
+================================================================================
+
+| String | Line | Source |
+|---|---|---|
+| `codearts` (cobra `Use`) | 24 | invented (agent name; opencode_uninstall.go:24 `Use: "opencode"` — not comparable) |
+| `Uninstall integration for CodeArts with AI Guard` (Short) | 25 | invented (template shared with opencode_uninstall.go:25 `Uninstall integration for OpenCode with AI Guard` — not byte-identical, product name differs) |
+| `Uninstall Huawei Cloud CodeArts integration with the Onyx AI Guard.` (Long, para 1) | 26 | invented (opencode_uninstall.go:26 `Uninstall OpenCode integration with the Onyx AI Guard.` — same slot, not identical) |
+| `Removes the guard plugin (~/.codeartsdoer/plugin/onyx-guard.ts and its onyx/` (Long) | 28 | invented (unique — opencode's uninstall Long describes `--integration-type` selection instead; no counterpart) |
+| `subdir). CodeArts's plugin/ directory is shared with the user's other plugins, so` (Long) | 29 | invented (unique) |
+| `only the Onyx-owned artifacts are removed — never the whole plugin/ dir.` (Long) | 30 | invented (unique) |
+| `When running as root (sudo), the integration is removed for all users on the` (Long) | 32 | **byte-identical to opencode_uninstall.go:39** |
+| `machine. Otherwise, it is removed only for the current user.` (Long) | 33 | **byte-identical to opencode_uninstall.go:40** |
+| `The command is idempotent - running it multiple times is safe.` (Long) | 35 | **byte-identical to opencode_uninstall.go:42** |
+| `Use --dry-run to preview changes without applying them.` (Long) | 37 | **byte-identical to opencode_uninstall.go:44** |
+| `Starting CodeArts uninstallation` (logger.Info) | 59 | invented (opencode_uninstall.go:58 uses `logger.Infow("Starting OpenCode uninstallation", "integration_type", ...)` — different call shape and text) |
+| `codearts_uninstall_flags: dry_run=%v, verbose=%v` (logger.Debugf) | 61-62 | invented (opencode_uninstall.go:64-65 is `opencode_uninstall_flags: dry_run=%v, verbose=%v, provider=%v, integration_type=%v` — codearts's is a strict prefix but a shorter, distinct format string; NOT byte-identical) |
+| `Uninstalling CodeArts integration` (logger.Info) | 72 | invented (opencode_uninstall.go:88 is `Uninstalling OpenCode integration` — same template, product name differs) |
+| `Uninstallation failed: %v` (logger.Errorf) | 75 | **byte-identical to opencode_uninstall.go:91** |
+| `uninstallation failed: %w` (fmt.Errorf) | 76 | **byte-identical to opencode_uninstall.go:92** |
+| `uninstallation completed with %d error(s)` (fmt.Errorf) | 88 | **byte-identical to opencode_uninstall.go:104** |
+| `CodeArts uninstall command completed successfully` (logger.Info) | 91 | invented (opencode_uninstall.go:107 is `OpenCode uninstall command completed successfully` — product name differs) |
+| `--dry-run` help: `Show what would be changed without applying modifications` | 99 | **byte-identical to opencode_uninstall.go:115** |
+| `--verbose` help: `Enable verbose output` | 100 | **byte-identical to opencode_uninstall.go:116** |
+| `--scan-endpoint` help: `Ingest endpoint for post-operation scan (optional)` | 101 | **byte-identical to opencode_uninstall.go:119** |
+| `--scan-api-key` help: `API key for post-operation scan (optional)` | 102 | **byte-identical to opencode_uninstall.go:120** |
+| `Dry run summary:` | 107 | **byte-identical to opencode_uninstall.go:125** |
+| `Uninstallation summary:` | 109 | **byte-identical to opencode_uninstall.go:127** |
+| `plugin_dir: %s\n` (fmt.Printf) | 113 | invented (opencode_uninstall.go:131 uses key `config_file: %s\n` — different key name; NOT identical) |
+| `existed: %v\n` (fmt.Printf) | 114 | **byte-identical to opencode_uninstall.go:132** |
+| `Removed:` (verb literal) | 118 | **byte-identical to opencode_uninstall.go:143** |
+| `Would remove:` (verb literal) | 120 | **byte-identical to opencode_uninstall.go:145** |
+| `  - Onyx guard plugin (onyx-guard.ts + onyx/ subdir)` | 123 | **byte-identical to opencode_uninstall.go:149** — **this is the verifier's flagged guard-plugin bullet for the uninstaller; confirmed present verbatim (note: this line, unlike the installer's, carries no path substring, so it matches OpenCode byte-for-byte)** |
+| `CodeArts integration uninstalled successfully!` | 126 | invented (opencode_uninstall.go:156 is `OpenCode integration uninstalled successfully!` — product name differs) |
+| `Restart CodeArts for changes to take effect.` | 127 | invented (opencode_uninstall.go:157 is `Restart OpenCode for changes to take effect.` — product name differs) |
+| `Run without --dry-run to apply these changes.` | 129 | **byte-identical to opencode_uninstall.go:159** |
+| `Integration not found - nothing to uninstall` | 133 | **byte-identical to opencode_uninstall.go:163** |
+| `No changes needed` | 135 | **byte-identical to opencode_uninstall.go:166** |
+| `Encountered errors during uninstallation:` (fmt.Println) | 140 | **byte-identical to opencode_uninstall.go:170** |
+| `Encountered errors during uninstallation:` (logger.Warn) | 141 | **byte-identical to opencode_uninstall.go:171** |
+| `   error: %v\n` (fmt.Printf) | 143 | **byte-identical to opencode_uninstall.go:173** — **verifier's flagged "   error: %v" line for the uninstaller; confirmed present verbatim** |
+| `error: %v` (logger.Errorf) | 144 | **byte-identical to opencode_uninstall.go:174** |
+
+uninstall.go totals: 37 strings inventoried — 24 byte-identical to OpenCode, 13 invented.
+
+================================================================================
+VERIFIER'S SPECIFICALLY-FLAGGED STRINGS — RESOLUTION
+================================================================================
+Every string the verifier called out as missing from the prior inventory was
+located and is listed above. Status of each, with exact current wording:
+
+1. `📊 Dry run summary:` — present, codearts_install.go:188. Byte-identical to opencode_install.go:276.
+2. "Skipped: <reason>" — present as the format string `Skipped: %s\n`, codearts_install.go:219. Byte-identical to opencode_install.go:324.
+3. `No changes needed` — present in BOTH files: codearts_install.go:221 and codearts_uninstall.go:135. Byte-identical to their opencode counterparts in both cases.
+4. Guard-plugin bullet mentioning `~/.codeartsdoer/plugin/onyx-guard.ts (tool.execute.before block + chat.message audit)` — present verbatim at codearts_install.go:201. NOT byte-identical to OpenCode (path differs: opencode uses ~/.config/opencode/plugin/... ), but structurally the same template — see Table 1.
+5. "Scanner binary and config" / "Scanner binary + config: ~/.codeartsdoer/plugin/onyx/" — BOTH present, as two DISTINCT lines: the dry-run bullet `  - Scanner binary and config` (install.go:202, no OpenCode counterpart at all) and the installed bullet `  - Scanner binary + config: ~/.codeartsdoer/plugin/onyx/` (install.go:207, near-identical to opencode_install.go:307 modulo path).
+6. `   error: %v` line — present in BOTH files (install.go:228, uninstall.go:143) as the format string `   error: %v\n` (three leading spaces). Byte-identical to both OpenCode counterparts.
+7. Flag help for --verbose, --api-key, --endpoint, --block-prompts, --scan-endpoint, --scan-api-key — all present, see Table 1 rows for install.go lines 168, 170, 171, 172, 173, 174. (--api-key and --endpoint do not exist on the uninstall command — codearts_uninstall.go has no such flags, matching opencode_uninstall.go which also lacks them.) Of these six, only --block-prompts is NOT byte-identical to OpenCode's wording (OpenCode's has an extra "For the plugin: " prefix); the other five are byte-identical.
+
+No verifier-listed string was found to be absent or reworded beyond recognition
+at head 290c2aa11563.
+
+================================================================================
+GRAND TOTAL
+================================================================================
+codearts_install.go:   56 strings — 27 byte-identical to OpenCode, 29 invented
+codearts_uninstall.go: 37 strings — 24 byte-identical to OpenCode, 13 invented
+COMBINED:              93 strings — 51 byte-identical to OpenCode, 42 invented

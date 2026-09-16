@@ -1,0 +1,79 @@
+================================================================================
+C16 — IDE-lane scope, GROUNDED IN THE CODE THIS DIFF SHIPS (not an opinion).
+       What surfaces does the change actually detect/parse/guard TODAY?
+================================================================================
+Commit under test: 290c2aa11563d0c5325995c2b77236065be6cb36
+Captured (UTC):    2026-09-16T21:52Z
+Method:            exhaustive grep of scanner/, backend_python/src, backend/,
+                   frontend/app/src at head; every hit quoted with file:line.
+
+--------------------------------------------------------------------------------
+FINDING (one sentence): the diff implements EXACTLY ONE CodeArts surface — the
+`codearts` CLI / terminal coding agent (config home ~/.codeartsdoer, an
+OpenCode-rebrand plugin + scanner hooks). There is NO detector, parser, source
+enum, or evaluate route for the `HuaweiCloud.vscode-codebot` VS Code extension
+or for a CodeArts JetBrains plugin anywhere in this change.
+
+================================================================================
+(1) Source enum — one CodeArts member, self-describing as the CLI
+================================================================================
+scanner/internal/types/source.go:38-43
+    // SourceCodeArts is Huawei Cloud CodeArts (the "codearts" CLI), a branded
+    // ... ~/.codeartsdoer/plugin/*.{ts,js} exactly like OpenCode's plugin dir ...
+    SourceCodeArts Source = "codearts"
+scanner/internal/types/source.go:46
+    var allowedSources = []Source{..., SourceCodeArts}   // exactly ONE codearts source
+  => No SourceCodeArtsVSCode / SourceCodeArtsJetBrains / SourceCodebot exists.
+
+================================================================================
+(2) Go detector registry — one CodeArts detector
+================================================================================
+scanner/cmd/hooks.go:56
+    types.SourceCodeArts: agents.NewCodeArtsDetector(afero.NewOsFs(), "", nil),
+  Sibling detectors in the same map: Cursor, OpenClaw, OpenCode, Copilot,
+  CodePuppy, Wibey, CodeArts. => No codebot / vscode-codebot / jetbrains-codearts
+  detector is registered.
+
+scanner/internal/agents/codearts/constants.go — config home pinned to
+  ~/.codeartsdoer (KERNEL_CONFIG_DIR, OPENCODE_CONFIG=$HOME/.codeartsdoer/codearts_cli.json).
+  This is the CLI's config home, not a VS Code / JetBrains extension path.
+
+================================================================================
+(3) DSL agent registry — one CodeArts entry, Linux-only
+================================================================================
+scanner/tools/dsl_agents/codearts.py — the only CodeArts DSL detector; builds
+  only for target_os == "linux" (CLI discovery is Linux-only, see S2 table).
+The directory DOES contain jetbrains_copilot.py and jetbrains_ide.py — these are
+  for JetBrains' OWN AI assistants and are UNRELATED to Huawei CodeArts (grep for
+  'codearts' in scanner/internal/agents/codearts/ ∩ 'jetbrains' = EMPTY). There is
+  NO codebot.py / vscode_codebot.py.
+
+================================================================================
+(4) Python parser lane — one CodeArts parser, terminal-only
+================================================================================
+backend_python/src/sanitization_service/api/parsers/codearts_parser.py
+    class CodeArtsParser(OpenCodeParser):   # DEFAULT_SERVICE_NAME = "codearts"
+    header: "CodeArts (Huawei) is a branded distribution of OpenCode: the terminal
+             AI coding agent ... reuses OpenCodeParser wholesale and overrides only
+             the SourceType it stamps (CODEARTS...) and the service name ('codearts')."
+  SourceType.CODEARTS is the only CodeArts source type. grep of
+  backend_python/src/sanitization_service/api/routes for 'codearts' = EMPTY
+  (no dedicated evaluate route beyond the shared OpenCode-shaped hooks path).
+
+================================================================================
+(5) Negative sweep — codebot / vscode-codebot nowhere in the tree
+================================================================================
+  grep -rniE 'codebot|vscode-codebot' scanner/ backend_python/src backend/
+    frontend/app/src  =>  EMPTY (no matches outside lockfiles).
+
+================================================================================
+CONCLUSION — routed to the owner (C16 lane scope), NOT self-decided
+================================================================================
+CODE FACT: the CLI/terminal CodeArts lane is fully implemented and proven
+  (discovery + posture + runtime block — see the S/C sections). The
+  HuaweiCloud.vscode-codebot VS Code extension and a CodeArts JetBrains plugin
+  are part of Huawei's CodeArts product family but have NO code path in this diff.
+OWNER DECISION (C16, May's): whether those IDE lanes are IN SCOPE for this ticket.
+  The ticket titles "the Huawei CodeArts coding agent" and names the CLI; the IDE
+  extensions are not named. Presented as facts + options; the scope call is May's.
+  AWAITING MAY'S DECISION — not self-answered.
