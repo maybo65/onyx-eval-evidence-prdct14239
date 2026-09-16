@@ -1,0 +1,203 @@
+================================================================================
+C2 ASSET LIFECYCLE — rescan-with-entity-GONE, raw psql evidence
+PR #13388 (Huawei CodeArts coding-agent support in the Onyx scanner)
+--------------------------------------------------------------------------------
+Commit:        290c2aa11563
+Tenant:        tenant_b_prdct14239  (uuid 4c7d92d8-d19b-4838-ace9-73731a36214b)  [THROWAWAY eval tenant]
+Isolated HOME: /tmp/c2-home   (copy of the CodeArts config layout; the real
+               /home/coder/.codeartsdoer was READ-ONLY, never modified)
+Ingest key:    Tenant…  (TenantB14239IngestKey…, Kong consumer
+               ingestion@4c7d92d8-d19b-4838-ace9-73731a36214b -> tenant B schema)
+Scanner:       /tmp/onyx-scanner (built from this branch; go1.26.6)
+psql helper:   /tmp/r7-psql.sh tenant_b_prdct14239 "<SQL>"
+Captured UTC:  2026-09-16T22:04Z .. 22:09Z
+================================================================================
+
+################################################################################
+HEADLINE FINDING (audit outcome: BLOCKED / PREMISE DISPROVEN)
+################################################################################
+The audit item asks to prove that on a rescan where an entity is GONE, its
+inventory row transitions to is_deleted=TRUE, for (1) the AGENT row, (2) a SKILL
+row, and (3) the builtin TOOL rows.
+
+Driven END-TO-END on the REAL lane (isolated home -> onyx-scanner -> Kong
+/mcp-scanner with tenant-B key -> S3 -> collector -> DesktopAgentCreator ->
+Postgres tenant_b_prdct14239), NONE of the three transitions occurs. After the
+entity is removed and the SAME installation scope is rescanned, every row stays
+is_deleted=f / is_active=t, unchanged and NOT duplicated. The claimed
+is_deleted=true transition does not exist in this lane's code for any of the
+three entity kinds.
+
+WHY (code-grounded; triple-confirmed by reading the lane + an independent code
+sweep + the prior tenant-A live run c2-uninstall-psql.txt):
+
+  * The ONLY rescan-driven soft-delete in the whole CodeArts/OpenCode desktop-
+    agent ingestion path operates on asset_connections rows of type AGENT_TO_MCP
+    (and AGENT_TO_MODEL), scoped by (source_asset_id, connection_type), via
+    AssetConnectionRepository.soft_delete_old_connections
+      backend_python/src/common/repository/asset_connection.py:752
+      driven from endpoint_asset_ingestion/ingestion/mcp_writer.py:1661
+      (activity mcp_asset_creation/activities.py:1643).
+    An EMPTY keep-set is deliberately SKIPPED (mcp_writer.py:1696-1708) — an
+    MCP-less/absent payload is treated as "no signal", never "delete everything".
+
+  * The parent desktop-agent asset (app_definition_id=endpoint_codearts) is only
+    ever UPSERTED + last-seen-touched (touch_agent_last_seen,
+    desktop_agent_creator/activities.py:3301). It is NEVER soft-deleted by scan
+    absence. Asset-level is_deleted=true is set ONLY on identity-migration /
+    placeholder-merge paths (activities.py:1571, 1829), not on "no longer
+    scanned". When the agent is undetected, NO agent payload is sent, so nothing
+    processes it and the row persists last-known-good.
+
+  * Builtin tools are UPSERT-ONLY: create_builtin_tools (activities.py:2790)
+    calls only ToolRepository.upsert_tools_bulk. deactivate_tools_not_in_list
+    (tools.py:665) is NEVER called for BUILTIN_AGENT_TOOL rows on a desktop
+    agent. The `tools` table has NO is_deleted column at all (only is_active /
+    source_enabled) — verified below.
+
+  * Skills are ADDITIVE-ONLY: skills_creation/activities.py:446 upserts skill
+    assets (insert-only) + AGENT_TO_SKILL edges. There is NO deactivate / soft-
+    delete / keep-set step for skills anywhere in the scanner lane, so a removed
+    SKILL.md flips neither the skill asset nor its AGENT_TO_SKILL edge.
+
+The real, provable rescan lifecycle signal for this lane is the AGENT_TO_MCP
+connection-EDGE soft-delete (agent present, >=1 MCP still reported, a previously-
+seen MCP absent) — proven on the live DB in c2-uninstall-psql.txt (tenant A,
+edge id 1441 is_deleted f->t). That is an EDGE transition, not an inventory-row
+(asset/tool) is_deleted transition, and it is none of the three kinds this item
+asks for.
+
+################################################################################
+SCAN COMMANDS (identical fixture, key masked; only the removed entity differs)
+################################################################################
+Base command (run from /tmp/c2-home):
+  HOME=/tmp/c2-home ONYX_SCANNER_DSL_ENABLED=true ONYX_FULL_SCAN=0 \
+    /tmp/onyx-scanner scan --verbose --full-scan=false --scan-dockers=false \
+    --endpoint 'http://localhost:8080/mcp-scanner' --api-key Tenant…
+
+Isolation verified BEFORE ingest (--output-file capture, no send): the payload
+carried ONLY /tmp/c2-home/.codeartsdoer as the codearts configPath; the single
+"/home/coder" string in it is host metadata (home_dir in the system-info block),
+not a scanned asset. Detector line every run:
+  agent_detection agent=codearts evidence_path=/tmp/c2-home/.codeartsdoer username=c2-home
+
+  SCAN A  (affirm: security block + codearts_cli.json mcp + skills/secure-review/SKILL.md)
+          scan_run_id e178473f-c25a-4569-b44e-ba4a509df7f5   scanner_installations id 8
+          codearts detected, mcp_servers_count=1, skills_total=1
+  SCAN B  (SKILL.md removed: rm -rf .codeartsdoer/skills/secure-review; agent+mcp present)
+          scan_run_id 33208d11-349b-4246-925f-2875a01324aa   scanner_installations id 9
+          codearts detected, mcp_servers_count=1, skills_total=0
+  SCAN C  (agent removed: security block deleted from cli-data/settings.json -> undetectable)
+          scan_run_id 60064c58-6fbc-4e0c-87df-f8fbfea3458b   scanner_installations id 10
+          codearts outcome=not_installed, payloads_sent=1 (NO codearts payload), total_agents=1
+
+  scanner_installations (mine):
+    id | scan_run_id                          | agents | mcp | skills | created_at
+     8 | e178473f-c25a-4569-b44e-ba4a509df7f5 |   2    |  1  |   1    | 2026-09-16 22:06:04+00
+     9 | 33208d11-349b-4246-925f-2875a01324aa |   2    |  1  |   0    | 2026-09-16 22:07:02+00
+    10 | 60064c58-6fbc-4e0c-87df-f8fbfea3458b |   1    |  0  |   0    | 2026-09-16 22:08:01+00
+
+The codearts agent in tenant B is the single shared fleet-wide asset id 2
+(app_definition_id=endpoint_codearts). SCAN A aggregated my c2-home identity into
+it (name -> "CodeArts (c2-home, coder, r7-ca-home)", updated_at -> 22:06:01),
+proving my isolated-home scan drives asset 2.
+
+################################################################################
+SUB-ITEM (2) SKILL row after SKILL.md deleted + rescan   ->  NOT marked deleted
+################################################################################
+SQL> SELECT a.id,a.name,a.type,a.is_deleted AS skill_asset_deleted,
+            c.id AS conn,c.connection_type,c.is_deleted AS edge_deleted,c.updated_at
+     FROM assets a JOIN asset_connections c ON a.id=c.destination_asset_id
+     WHERE c.source_asset_id=2 AND a.id=211;
+
+  BEFORE (after SCAN A affirm, 22:06:19Z):
+    211  secure-review  AssetTypeSkill  f | 206  AgentToSkill  f  2026-09-16 18:00:02.493614+00
+  AFTER  (SCAN B, SKILL.md removed, install id 9 landed):
+    211  secure-review  AssetTypeSkill  f | 206  AgentToSkill  f  2026-09-16 18:00:02.493614+00
+
+  Direct skill asset row (unchanged):
+    211  secure-review  AssetTypeSkill  AssetStatusDiscovered  is_deleted=f  updated_at 2026-09-16 18:06:47+00
+  agent_skills row still present:  id 129  asset_id 211  skill_md_hash 6d2041ece80ab9e5faba6513c0da330205d1ac329fbc21b823459081ec65f5a4
+
+  SETTLEMENT: same row id 211 — is_deleted stays f (NOT f->t); the AGENT_TO_SKILL
+  edge 206 is untouched (updated_at unchanged 18:00:02). Skills are additive-only;
+  removing SKILL.md flips neither the skill asset nor its edge. NOT deleted, NOT
+  duplicated. Expected transition to is_deleted=t did NOT occur.
+
+################################################################################
+SUB-ITEM (1) AGENT row after agent removed + rescan       ->  NOT marked deleted
+################################################################################
+SQL> SELECT id,name,type,status,is_deleted,updated_at FROM assets WHERE id=2;
+
+  BEFORE (pre-SCAN-C, 22:07Z):
+    2  CodeArts (c2-home, coder, r7-ca-home)  AssetTypeDesktopAgent  is_deleted=f  2026-09-16 22:06:01.464785+00
+  AFTER  (SCAN C, agent undetected outcome=not_installed, install id 10 landed):
+    2  CodeArts (c2-home, coder, r7-ca-home)  AssetTypeDesktopAgent  is_deleted=f  2026-09-16 22:06:01.464785+00
+
+  SQL> SELECT count(*) FROM assets WHERE app_definition_id='endpoint_codearts';  -> 1
+
+  SETTLEMENT: same row id 2 — is_deleted stays f (NOT f->t) and updated_at is
+  unchanged (22:06:01) i.e. the row was not even touched. Removing the agent sends
+  NO codearts payload, so the shared endpoint_codearts asset persists last-known-
+  good; there is no scan-absence reaper for the parent agent. Still exactly ONE
+  endpoint_codearts asset (no duplicate/resurrection). Expected transition to
+  is_deleted=t did NOT occur.
+
+################################################################################
+SUB-ITEM (3) builtin TOOL rows after agent removed + rescan -> NOT marked deleted
+################################################################################
+NOTE: the `tools` table has NO is_deleted column (lifecycle would be via
+is_active). Verified:
+  SQL> SELECT count(*) FROM information_schema.columns
+       WHERE table_schema='tenant_b_prdct14239' AND table_name='tools'
+         AND column_name='is_deleted';   -> 0
+
+SQL> SELECT count(*) n, bool_and(is_active) all_active, max(updated_at) newest
+     FROM tools WHERE external_id LIKE 'builtin:codearts:%';
+
+  BEFORE (pre-SCAN-C):
+    n=17  all_active=t  newest=2026-09-16 14:28:02.513647+00
+  AFTER  (SCAN C, agent undetected, install id 10 landed):
+    n=17  all_active=t  newest=2026-09-16 14:28:02.513647+00
+
+  Representative same rows (id | external_id | is_active | updated_at), unchanged:
+    1   builtin:codearts:bash   t  2026-09-16 14:28:02.513647+00
+    4   builtin:codearts:batch  t  2026-09-16 14:28:02.513647+00
+    7   builtin:codearts:edit   t  2026-09-16 14:28:02.513647+00
+    10  builtin:codearts:glob   t  2026-09-16 14:28:02.513647+00
+    14  builtin:codearts:grep   t  2026-09-16 14:28:02.513647+00
+
+  SETTLEMENT: all 17 same tool rows persist is_active=t with updated_at unchanged
+  (14:28:02). There is no is_deleted column and no deactivation-on-absence for
+  builtin agent tools (create_builtin_tools is upsert-only). Expected transition
+  to is_deleted=t did NOT occur (and is not expressible on this table).
+
+################################################################################
+CROSS-CHECK: all children of agent 2 after the full sequence (nothing deleted)
+################################################################################
+SQL> SELECT a.id,a.name,a.type,a.is_deleted AS asset_del,c.is_deleted AS edge_del
+     FROM assets a JOIN asset_connections c ON a.id=c.destination_asset_id
+     WHERE c.source_asset_id=2 ORDER BY a.id;
+   68   onyx-verify-probe      AssetTypeMCP    f | edge t   (pre-existing, unrelated)
+  211   secure-review          AssetTypeSkill  f | edge f
+  212   Filesystem MCP Server  AssetTypeMCP    f | edge f
+
+################################################################################
+VERDICT
+################################################################################
+BLOCKED — the audited transition (inventory row is_deleted f->t on rescan-gone)
+is NOT implemented for the AGENT asset, the SKILL asset, or the builtin TOOL rows
+in the CodeArts/OpenCode desktop-agent scanner lane. Empirically reproduced on
+the real lane into the throwaway tenant B: every targeted row stayed is_deleted=f
+/ is_active=t, unchanged and not duplicated, across removal+rescan of the same
+installation scope. The only rescan lifecycle transition in this lane is the
+AGENT_TO_MCP connection-edge soft-delete (proven on the live DB in
+c2-uninstall-psql.txt, tenant A) — an edge, not an inventory row, and none of the
+three kinds requested. Reported as BLOCKED per the safety rails rather than
+manufacturing an is_deleted=t row the system does not produce.
+
+SAFETY: all writes went to tenant_b_prdct14239 only (Kong consumer resolved from
+the tenant-B ingest key); the main tenant onyx_security was never scanned into or
+mutated. The real /home/coder/.codeartsdoer was read-only. /tmp/c2-home cleaned
+up after capture.
+================================================================================
