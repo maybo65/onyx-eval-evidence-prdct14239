@@ -1,0 +1,51 @@
+C2 MAIN-REPRO v2 — remove-then-rescan for a PRE-EXISTING agent (OpenCode) on origin/main WITHOUT this PR
+purpose: prove non-tombstone-on-rescan is PLATFORM-WIDE (pre-existing), fixing the round-16 stray-payload flaw
+main scanner (origin/main): 5a50c242a372cf67455bc1e2f256e6fb95d0303d   PR head (contrast): eeec7e101ef84cbe65044a29a953e38d7f9544dd
+tenant: onyx_security (61750f27)   schema: onyx_security   endpoint: Kong :8080 /mcp-scanner (key-auth)
+on-PATH binary: /home/coder/.local/bin/opencode = codearts v26.9.4 (compiled OpenCode); config: ~/.config/opencode/opencode.json
+classes under test on THIS agent: (1) agent asset  (2) 17 builtin:opencode tool rows.
+  NOTE: OpenCode ships NO skills (scanner scanner/internal/scanner/agents/opencode.go:328-329
+  'GetSkillsConfig returns nil - OpenCode doesnt support skills yet'), so the skill+AGENT_TO_SKILL
+  class is structurally absent here; it is proven on the ticket agent CodeArts in c2-lifecycle.txt.
+generated: 2026-09-17T03:38:52Z
+==========================================================================
+
+### PROOF-A (code): this PR touches ZERO reconcile/persistence code — behavior CANNOT differ from main
+-- files this PR changes under the reconcile/persistence lane (expect EMPTY) --
+(empty list above = reconcile/upsert lane identical between main and this PR; the SAME lane reconciles
+ agent assets, skill assets and tool rows — it is asset-class-agnostic, so the class shown here generalizes.)
+
+### PHASE 0 — present-scan with MAIN scanner (OpenCode present)
+scan_run_id (present): 9b9baf4b-3fef-4096-9d4c-de395aa400e2
+opencode payloads (expect >=1):
+1
+2026-09-17T03:38:56.200832695Z	DEBUG	Preparing to send static payload for agent	{"agent": "opencode", "username": "coder", "config_path": "/home/coder/.config/opencode/opencode.json", "mcp_servers_count": 1}
+scan completed:
+1
+waiting 120s for ingest...
+[agent asset BEFORE removal]
+2764|OpenCode (coder)|endpoint_opencode|Desktop|f|2026-09-17 03:41:49.536468+00
+[17 builtin:opencode tools BEFORE removal]
+17|30|46|17|2026-09-17 00:31:01.087756+00
+
+### PHASE 1 — GENUINE REMOVAL: delete config AND on-PATH binary, then rescan (OpenCode fully absent)
+post-removal: opencode on PATH? NO; config present? NO
+scan_run_id (removal): 7158dd2c-524f-4024-b063-309dd3027959
+opencode payloads (EXPECT 0 — config AND binary gone):
+0
+scan completed:
+1
+waiting 120s for ingest...
+[agent asset AFTER removal — same id, is_deleted still f => NOT tombstoned]
+2764|OpenCode (coder)|endpoint_opencode|Desktop|f|2026-09-17 03:41:49.536468+00
+[17 builtin:opencode tools AFTER removal — same ids, is_active still t => NOT tombstoned]
+17|30|46|17|2026-09-17 00:31:01.087756+00
+
+==========================================================================
+C2 MAIN-REPRO v2 OUTCOME: on origin/main (5a50c242a372cf67455bc1e2f256e6fb95d0303d), WITHOUT this PR, a GENUINE removal of a pre-existing
+agent (config AND binary gone => the removal scan 7158dd2c-524f-4024-b063-309dd3027959 carries ZERO opencode payloads) does NOT tombstone
+its asset row NOR its 17 builtin tool rows — both persist with the SAME ids, is_deleted=f / is_active=t,
+and updated_at UNCHANGED by the removal scan (not even a last-seen touch). Identical to CodeArts on this PR.
+The non-deletion is pre-existing, asset-class-agnostic reconcile-lane behavior (PROOF-A: reconcile files
+unchanged by this PR); the third class (skill+edge) is absent on OpenCode by design and is proven on the
+ticket agent CodeArts in c2-lifecycle.txt. scan_run_ids: present=9b9baf4b-3fef-4096-9d4c-de395aa400e2 removal=7158dd2c-524f-4024-b063-309dd3027959
