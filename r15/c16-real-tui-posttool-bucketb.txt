@@ -1,0 +1,54 @@
+C16 render (b) — post_tool (tool.execute.after) blockedToolOutputNotice in the REAL TUI
+========================================================================================
+head: eeec7e101ef84cbe65044a29a953e38d7f9544dd
+generated: 2026-09-17 (UTC)
+VERDICT: BUCKET B — the real CodeArts TUI cannot HONESTLY be made to paint a content-keyword
+post_tool block frame, because a deterministic keyword rule does not fire on the post_tool lane.
+This is stated as a real failed-attempt/structural fact, NOT faked and NOT substituted with a node render.
+
+WHAT WAS ATTEMPTED (same temp keyword rule, all three lanes)
+-----------------------------------------------------------
+The temp Block rule "c16 render probe (temp)" had BOTH input and output classification enabled and
+carried sentinels for the prompt lane AND the post-tool lane. Driving the real scanner hooks for all
+three payload lanes with the sentinel present produced (scanner.log, ~/.onyx/mcp-scanner/logs/scanner.log):
+
+  line 1206  hook_type "llm_input"   session ses_c16aVALID    evaluate_action "block"   <-- render (a), producible
+  line 1215  hook_type "post_tool"   session ses_c16bVALID    evaluate_action "allow"   <-- WILL NOT content-block
+  line 1223  hook_type "llm_output"  session ses_c16outVALID   evaluate_action "allow"   <-- WILL NOT content-block
+
+STRUCTURAL REASON (why this is bucket b, not a missed capture)
+-------------------------------------------------------------
+A deterministic custom_rule keyword rule fires ONLY on the llm_input (prompt) lane. The post_tool lane
+(the plugin's tool.execute.after hook -> --type=post_tool) is OBSERVE-ONLY for content and is the
+MCP-SANCTION lane: it returns block ONLY on an MCP-identity sanction verdict (an unsanctioned MCP tool
+the agent actually invoked), never on a content keyword. So the ONLY way the installed plugin emits
+`blockedToolOutputNotice` in a real TUI is: the codearts agent calls a REGISTERED-BUT-UNSANCTIONED MCP
+server's tool, the post_tool hook gets sanction_action != skipped with a block, and the plugin redacts
+the result and injects the notice.
+
+WHY THAT REAL PATH DID NOT PAINT IN THIS WINDOW (honest failed transcript)
+--------------------------------------------------------------------------
+The live TUI session's own status panel shows the configured MCP server erroring before any tool ran:
+    MCP
+    • onyx-verify-probe  SSE error: Was there a typo in the url or port?
+i.e. the one MCP server wired into this codearts config never completed an SSE handshake, so the agent
+never successfully executed an MCP tool, so tool.execute.after never carried an MCP identity to sanction,
+so no post_tool block verdict was produced to render. Standing up a fully-handshaking unsanctioned MCP
+server that the GLM-5.1 agent chooses to call, purely to paint this one frame, was not achievable in the
+free-tier session budget for this round.
+
+WHAT IS PROVEN INSTEAD (so the lane is not unproven, only the TUI FRAME is bucket b)
+-----------------------------------------------------------------------------------
+- The post_tool MCP-sanction verdict path itself is proven END-TO-END elsewhere in this PR's evidence on
+  the real ingest/sanction lane (evidence/c7-mcp-sanction-pair.txt, evidence/09-at2-sanctioned.png and the
+  cr12 sanction UI captures) — the sanction that drives redaction is real and exercised.
+- The blockedToolOutputNotice string the plugin would inject is the plugin's own verbatim code
+  (onyx-guard.ts blockedToolOutputNotice, line 299) — its exact text is documented, but a text render of
+  it is NOT presented as a real TUI frame (that was the round-10 node-driver artifact this round retires).
+
+BOTTOM LINE
+-----------
+render (a) llm_input Block: REAL TUI frame captured (evidence/r15/c16-real-tui-llminput.png) — matrix row 3.
+render (b) post_tool blockedToolOutputNotice: BUCKET B for the real-TUI frame — the lane won't content-block
+and the MCP-sanction path couldn't be driven to a painted frame this round; stated honestly, no stub passed
+off as a real TUI. The underlying sanction/redaction behavior is proven on the real lane (cited above) — matrix row 4.

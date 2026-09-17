@@ -1,0 +1,48 @@
+C16 render (a) — REAL CodeArts TUI, llm_input (prompt) Block lane
+=================================================================
+head: eeec7e101ef84cbe65044a29a953e38d7f9544dd
+generated: 2026-09-17 (UTC)
+agent: REAL Huawei CodeArts CLI 26.9.4  (/home/coder/.local/bin/codearts), model huaweicloud-maas/GLM-5.1
+plugin: the INSTALLED bundled plugin ~/.codeartsdoer/plugin/onyx/onyx-guard.ts -> onyx-scanner (config onyx-config.json: block-prompts=true)
+config home: ~/.codeartsdoer   project cwd: /tmp/c16/proj
+frame (verbatim tmux capture -> rasterized): evidence/r15/c16-real-tui-llminput.png  (source ANSI: /tmp/c16/frames2/08.ansi)
+
+WHAT THIS PROVES (replaces the round-10 node-driver link in matrix row 3)
+-------------------------------------------------------------------------
+This is the REAL CodeArts terminal UI (not a node driver, not a stub) painting the llm_input Block.
+Method: a deterministic keyword Block rule "c16 render probe (temp)" was enabled on the llm_input
+(prompt) lane of policy 22, a tripping prompt was typed into the live TUI, submitted, and the TUI
+frame was captured with `tmux capture-pane -e -p` and rasterized VERBATIM (SGR colors + text exactly
+as painted — nothing reconstructed). Policy 22 was RESTORED to its pristine state immediately after
+(only "Block CodeArts shell command" enabled again; see restore verification below).
+
+The frame shows the plugin's chat.message hook (-> --type=llm_input) doing IN-PLACE PROMPT REPLACEMENT
+(replacePromptText) when the verdict is block with block-prompts enabled:
+  [Onyx AI Guard — system-generated notice]
+  The user's message was blocked by your organization's security policy before it reached you,
+  because it violated the AI usage policy ...
+  Your request was blocked by Onyx AI Guard.
+  Violated rules: c16 render probe (temp)
+  Onyx Violation ID: 51e3c53427134fc0aa0d5cc7ce34cbe7
+...and then the REAL GLM-5.1 model relaying that replacement back to the user:
+  Thinking: The user's message was blocked by an organization's security policy (Onyx AI Guard)...
+  Your message was blocked by Onyx AI Guard and was not delivered to me. The blocked content
+  violated the AI usage policy.
+  Violation details:  - Rule: c16 render probe (temp)  - Violation ID: 51e3c53427134fc0aa0d5cc7ce34cbe7
+Right panel confirms this is the real session: Id ses_f532c40beffejFxfXx1GeqJLc1, Total Tokens 21.1K,
+model GLM-5.1 huaweicloud-maas, CodeArts 26.9.4.
+
+SCANNER-LOG PAIRING (~/.onyx/mcp-scanner/logs/scanner.log — SAME session id as the frame)
+-----------------------------------------------------------------------------------------
+line 1231  INFO  Prompt blocked  {"block_reason": ["Your request was blocked by Onyx AI Guard.\n
+             Violated rules: c16 render probe (temp)\n\n[ONYX_VIOLATION_ID:51e3c53427134fc0aa0d5cc7ce34cbe7]"]}
+line 1232  INFO  hook_invocation {"hook_source": "codearts", "hook_type": "llm_input",
+             "session_id": "ses_f532c40beffejFxfXx1GeqJLc1", "is_mcp_tool": false,
+             "evaluate_action": "block", "exit_code": 0, "elapsed_ms": 64, "sample_rate": 1}
+The session_id in the scanner log (ses_f532c40beffejFxfXx1GeqJLc1) is IDENTICAL to the session Id
+painted in the TUI frame -> the block in the frame and the block in the scanner log are the same event.
+
+POLICY 22 RESTORE VERIFICATION (after the capture)
+--------------------------------------------------
+UPDATE 1 (restored from pristine /tmp/c16/policy22.backup.json)
+enabled rules in policy 22 now = ["Block CodeArts shell command"]   (temp probe rule GONE)
