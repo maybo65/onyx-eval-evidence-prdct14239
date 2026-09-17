@@ -1,0 +1,62 @@
+C16 — CodeArts MCP-guard sanction lane FAILS OPEN on the default dynamic-dispatch tool path
+head: eeec7e101ef84cbe65044a29a953e38d7f9544dd   binary: bundled ~/.codeartsdoer/plugin/onyx/onyx-scanner (vcs.revision=eeec7e101e)
+generated: 2026-09-17T01:56:29Z
+session (real codearts 26.9.4 TUI, GLM-5.1 huaweicloud-maas): ses_f52f35cb7ffe8KWfHEvqsnto4b
+==================================================================================
+
+## 0. SSE FIX — the round-15 blocker is RESOLVED (server stood up + codearts connects)
+A real spec-compliant MCP streamable-HTTP server was stood up on localhost:3001/mcp
+  $ npx -y @modelcontextprotocol/server-everything streamableHttp   (tools: echo, add, ...)
+  $ curl -s -o /dev/null -w '%{http_code} %{content_type}' -XPOST localhost:3001/mcp -d '{initialize...}'
+     -> HTTP 200 text/event-stream
+  $ codearts mcp list  ->  onyx-verify-probe : Connected   (see TUI frame sidebar 'MCP: onyx-verify-probe Connected')
+  The config bridge that makes codearts read this: ~/.codeartsdoer/installers/codearts exports
+  OPENCODE_CONFIG=$HOME/.codeartsdoer/codearts_cli.json ; resolver reads OPENCODE_CONFIG at resolve.go:347.
+  => the round-15 'SSE errored, tool never appeared' bucket-b is CLOSED: the fix attempt SUCCEEDED at transport.
+
+## 1. THE FINDING — live TUI drove the real 'echo' tool; the MCP sanction lane never fired
+The GLM-5.1 model calls MCP tools through a GENERIC DISPATCHER TOOLSET (tool_search / tool_describe /
+tool_call), carrying the real per-server MCP id in tool_params.id. Decoded verbatim from THIS session's
+hook payloads (base64 'Full hook input' blobs in scanner.log, decoded):
+
+  tool_name = 'tool_search'    tool_params = {"query": "+onyx-verify-probe echo"}
+  tool_name = 'tool_describe'  tool_params = {"id": "onyx-verify-probe_echo"}
+  tool_name = 'tool_call'      tool_params = {"id": "onyx-verify-probe_echo", "args": {"message": "TUI_C16_PROBE"}}
+
+The scanner's opencodeHookPayload struct reads ONLY tool_name (resolve.go:102-106) — never tool_params.id.
+So it matches 'tool_call' against configured server prefixes (sanitize(serverKey)+"_") -> NO match ->
+opencodeIdentityOutcome() returns 'unresolved_prefix' -> MCP sanction is SKIPPED and authorize is NEVER sent.
+
+## 2. scanner.log — the fail-open on BOTH the deny lane (tool) and the notice lane (post_tool)
+  --- mcp_identity_outcome lines (session ses_f52f35cb7ffe8KWfHEvqsnto4b, tool + post_tool legs) ---
+    "hook_type": "post_tool", "outcome": "unresolved_prefix", "matched_key": "", "transport": "", "sanction_action": "skipped", "sanction_target": "", "target_kind": "", "authorize_request_sent": false
+    "hook_type": "tool", "outcome": "unresolved_prefix", "matched_key": "", "transport": "", "sanction_action": "skipped", "sanction_target": "", "target_kind": "", "authorize_request_sent": false
+
+  --- hook_invocation lines (same session, tool + post_tool legs) ---
+    "hook_type": "post_tool", "session_id": "ses_f52f35cb7ffe8KWfHEvqsnto4b", "is_mcp_tool": true, "mcp_guard_hooks": true, "outcome": "unresolved_prefix", "sanction_action": "skipped", "evaluate_action": "allow"
+    "hook_type": "tool", "session_id": "ses_f52f35cb7ffe8KWfHEvqsnto4b", "is_mcp_tool": true, "mcp_guard_hooks": true, "outcome": "unresolved_prefix", "sanction_action": "skipped", "evaluate_action": "allow"
+
+  Interpretation:
+    hook_type=tool      -> row 5 (tool.execute.before DENY render)          : unresolved_prefix / skipped / authorize NOT sent
+    hook_type=post_tool -> row 4 (tool.execute.after blockedToolOutputNotice): unresolved_prefix / skipped / authorize NOT sent
+  Both legs report is_mcp_tool=true but the MCP sanction/authorize call never leaves the box => guard FAILS OPEN.
+  (The content-evaluate lane still runs: evaluate_action=allow — only the MCP sanction lane is dead on this path.)
+
+## 3. Corroboration: the live model's own llm_output confirms the echo tool actually ran
+  Decoded assistant_texts (same session): "...The interaction was a simple MCP tool echo probe (`TUI_C16_PROBE`)..."
+  Real-TUI frame (evidence/r16/c16-real-tui-dispatcher-failopen.png): tool_search/tool_describe/tool_call
+  [id=onyx-verify-probe_echo] visible in the codearts 26.9.4 TUI; 'The tool echoed back: TUI_C16_PROBE';
+  sidebar Session Id ses_f52f35cb7ffe8KWfHEvqsnto... (matches this log) + 'MCP: onyx-verify-probe Connected'.
+
+## 4. Source cites (this PR head eeec7e101ef84cbe65044a29a953e38d7f9544dd)
+  scanner/internal/agents/opencode/opencodeidentity/resolve.go:102-106  opencodeHookPayload reads only tool_name
+  scanner/internal/agents/opencode/opencodeidentity/resolve.go:347      resolver reads OPENCODE_CONFIG env (config bridge)
+  scanner/cmd/hooks.go:333                                              is_mcp_tool derived from outcome, not from tool_params.id
+  scanner/cmd/hooks_mcp_sanction.go:223                                 CodeArts routes to opencodeidentity.Resolve()
+  scanner/cmd/codearts_mcp_guard_hooks_e2e_test.go:104                  e2e fixture uses the DIRECT tool_name shape ("probe_echo_probe"),
+                                                                        i.e. the dispatcher path was never modelled in tests
+
+## 5. The one-line fix (PRESENTED AS AN OWNER/SCOPE DECISION — not applied this round)
+  When tool_name is a dispatcher meta-tool (tool_call/tool_search/tool_describe) and tool_params.id is present,
+  resolve identity from tool_params.id instead of tool_name. This is dispatcher-mode support = a scope/design
+  call for the owner (May); per the 'no product code this round' constraint it is documented, not committed.
