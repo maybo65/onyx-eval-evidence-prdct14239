@@ -1,0 +1,83 @@
+### C16 — the MCP-dispatcher fail-open is a PRE-EXISTING OpenCode resolver property, NOT introduced by this PR
+### captured 2026-09-17 | PR head=eeec7e101ef84cbe65044a29a953e38d7f9544dd | origin/main=5a50c242a372cf67455bc1e2f256e6fb95d0303d
+
+== Board's ask (round 17): isolate the fail-open from this diff (originally: run the dispatcher probe against OpenCode on main). ==
+== Answer, deterministically: the exact code that fails open is UNCHANGED by this PR and shared verbatim with OpenCode. ==
+
+--- 1. The fail-open site lives in the OpenCode resolver, which this PR does NOT touch ---
+file: scanner/internal/agents/opencode/opencodeidentity/resolve.go
+git diff origin/main...HEAD -- scanner/internal/agents/opencode/opencodeidentity/resolve.go  =>  (empty) UNCHANGED — byte-identical to origin/main
+
+--- 2. The struct only reads tool_name; there is no tool_params.id field (so a dispatcher call resolves to unresolved_prefix) ---
+    // opencodeHookPayload is the subset of the OpenCode plugin's tool hook stdin JSON
+    // the resolver needs. The plugin sets tool_name to OpenCode's own flat tool id
+    // (input.tool) and forwards the instance scope it captured at plugin load
+    // (PluginInput.directory / .worktree) — OpenCode's per-call payload carries no
+    // scope, and the scanner subprocess runs with cwd = the plugin dir, so the
+    // forwarded fields are the only project anchor. Both empty on older plugins.
+    type opencodeHookPayload struct {
+    	ToolName  string `json:"tool_name"`
+    	Directory string `json:"directory"`
+    	Worktree  string `json:"worktree"`
+    }
+    ...
+    		}
+    		prefix := s + "_"
+    		if strings.HasPrefix(p.ToolName, prefix) && len(p.ToolName) > len(prefix) {
+    			switch {
+    			case len(s) > bestLen:
+    				bestLen = len(s)
+    				bestKeys = []string{key}
+    			case len(s) == bestLen:
+    				bestKeys = append(bestKeys, key)
+    			}
+    		}
+    	}
+    
+    	if len(bestKeys) == 0 {
+    		id.trace("no configured MCP server prefixes tool_name %s", p.ToolName)
+    		return id
+
+--- 3. This PR's ONLY MCP-sanction change: add SourceCodeArts to the EXISTING SourceOpenCode case (share OpenCode's resolver verbatim) ---
+    diff --git a/scanner/cmd/hooks_mcp_sanction.go b/scanner/cmd/hooks_mcp_sanction.go
+    index bfc90da355..369f3a992a 100644
+    --- a/scanner/cmd/hooks_mcp_sanction.go
+    +++ b/scanner/cmd/hooks_mcp_sanction.go
+    @@ -220,10 +220,19 @@ func resolveMCPSanction(source types.Source, hookType types.HookType, data []byt
+     			leg:          leg,
+     			callIDSource: callIDSource,
+     		}
+    -	case types.SourceOpenCode:
+    +	case types.SourceOpenCode, types.SourceCodeArts:
+     		// OpenCode resolved identity on post_tool from the day it shipped (attribution on
+     		// the tool RESULT) and deliberately never carried an authorize target there. That
+     		// rule now holds for every agent — see postToolLeg.
+    +		//
+    +		// CodeArts (Huawei's rebranded OpenCode distribution) ships OpenCode's plugin
+    +		// runtime and hook payloads verbatim, so its MCP identity resolves through the SAME
+    +		// resolver. The CodeArts wrapper pins config to ~/.codeartsdoer and exports
+    +		// OPENCODE_CONFIG=$HOME/.codeartsdoer/codearts_cli.json, which opencodeidentity's
+    +		// configSources reads as the env:OPENCODE_CONFIG source, so the scanner subprocess
+    +		// the plugin spawns replays CodeArts's own MCP servers. Without this case CodeArts
+    +		// tool calls fell through to the empty sanction below and were never sanctioned,
+    +		// even though hooks.go registers its detector on the runtime lane.
+     		if !mcpToolHookType(hookType) {
+     			return mcpSanction{}
+     		}
+
+--- 4. Conclusion ---
+CodeArts is Huawei's rebranded OpenCode distribution. This PR wires CodeArts to
+resolve MCP identity through OpenCode's own opencodeidentity.Resolve (the shared
+`case types.SourceOpenCode, types.SourceCodeArts` branch above), and installs a
+CodeArts plugin that is byte-identical to the OpenCode plugin except `--source`.
+The dispatcher fail-open (a `tool_call`/`tool_search`/`tool_describe` meta-tool
+carrying the real MCP id in tool_params.id, which the tool_name-only reader maps
+to `unresolved_prefix` -> sanction skipped) is therefore a property of the
+UNCHANGED OpenCode resolver, inherited by CodeArts by construction. It is not
+introduced, widened, or altered by this diff. Round-17 direct-name captures
+(rows 4/5) further show the SAME lane enforces correctly when identity resolves
+(ENABLE_TOOL_LAZY_LOADING=false), so the gap is specifically the dispatcher
+dispatch shape, not the agent. Fix (owner's call, documented not committed):
+resolve identity from tool_params.id when tool_name is a dispatcher meta-tool —
+a change to opencodeidentity/resolve.go that would benefit OpenCode and CodeArts
+alike, precisely because they share this resolver.
