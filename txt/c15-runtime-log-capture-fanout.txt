@@ -1,0 +1,58 @@
+# C15 — runtime-log-capture applicable-count (zombie / missing-runtime-log matcher)
+# Head sha: eeec7e101ef84cbe65044a29a953e38d7f9544dd   Date: 2026-09-17   Box tenants: onyx_security, tenant_b_prdct14239
+# Read-only evidence. DOCUMENTS an existing code default — no product code changed.
+#
+# The default under measurement (catalog_entries.py:179):
+#   "codearts" was ADDED to RUNTIME_LOG_CAPTURE_DESKTOP_AGENT_SLUGS.
+# Consequence (catalog_entries.py:221-230, 281-289): desktop_agent_has_runtime_log_capture()
+#   and its SQL twin desktop_capture_sql_predicate() now return True for CodeArts assets, so a
+#   CodeArts DESKTOP_AGENT row becomes APPLICABLE to the ISSUE_ZOMBIE_AGENT matcher
+#   ("Endpoint AI Agent Missing Runtime Logs", severity 5.0, risk_factor Inactive30Days,
+#   catalog_entries.py:406-455) WITHOUT any tenant opt-in.
+#
+# The SQL applicable-count denominator = the SQL twin desktop_capture_sql_predicate() applied over
+# assets: type = AssetTypeDesktopAgent, is_deleted = false, and the vendor slug (the exact
+# _asset_vendor_slug_sql() expression) IN _CAPTURE_IDENTIFIER_FORMS (bare + endpoint_ spellings of
+# every capture-capable slug). "AFTER" includes codearts/endpoint_codearts; "BEFORE" omits them.
+
+vendor_slug := lower(split_part(coalesce(nullif(app_definition_id,''),nullif(unique_identifier,''),''),'::',1))
+
+## Q1 — AFTER denominator (codearts IN the slug set) — onyx_security
+$ kubectl exec -n onyxd postgres-1 -c postgres -- psql -U postgres -d postgres -qtAX \
+    -c "SET search_path=onyx_security; SELECT count(*) FROM assets WHERE is_deleted=false
+        AND type='AssetTypeDesktopAgent' AND <vendor_slug> IN (<20 bare+endpoint_ capture forms incl. codearts>);"
+3
+
+## Q2 — BEFORE denominator (codearts NOT in the slug set) — onyx_security
+$ ... AND <vendor_slug> IN (<18 forms, WITHOUT codearts/endpoint_codearts>);
+2
+
+## Q3 — CodeArts delta (rows that NEWLY join the denominator) — onyx_security
+$ ... AND <vendor_slug> IN ('codearts','endpoint_codearts');
+1
+
+## Q4 — composition of the AFTER denominator by vendor slug — onyx_security
+$ ... GROUP BY vendor_slug ORDER BY n DESC, vendor_slug;
+ endpoint_claude-code | 1
+ endpoint_codearts    | 1     <-- newly applicable due to this default
+ endpoint_opencode    | 1
+
+## Q5 — per-tenant CodeArts desktop-agents newly applicable (both schemas on this box)
+ onyx_security        -> 1   (asset id 230, app_definition_id=endpoint_codearts, status Unsanctioned)
+ tenant_b_prdct14239  -> 1
+ -------------------------------------------------
+ total across both tenants on this box: 2 (one per tenant), all with NO opt-in
+
+## Conclusion (real measurement — no fabricated numbers)
+- Zombie/missing-runtime-log applicable-count (denominator) on onyx_security moves 2 -> 3 purely
+  because "codearts" joined RUNTIME_LOG_CAPTURE_DESKTOP_AGENT_SLUGS; the CodeArts-specific delta is +1.
+- Both tenants present on this box each have exactly one discovered CodeArts DESKTOP_AGENT, so on
+  deploy 2 CodeArts assets (1 per tenant) become applicable to ISSUE_ZOMBIE_AGENT with no opt-in.
+- Deploy-day projection: for ANY tenant, every already-discovered CodeArts desktop-agent install
+  becomes applicable to the zombie/missing-runtime-log matcher on the first posture sweep after
+  deploy — the applicable-count for that tenant rises by its count of non-deleted CodeArts
+  DESKTOP_AGENT rows, with no operator action. (The issue only FIRES when such an asset also has
+  no runtime logs AND is Inactive30Days; applicability is the denominator, firing is the numerator.)
+- The Python gate (desktop_agent_has_runtime_log_capture) and the SQL twin
+  (desktop_capture_sql_predicate) are derived from the same frozenset via _CAPTURE_IDENTIFIER_FORMS,
+  so matcher and compliance denominator cannot drift.
