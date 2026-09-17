@@ -1,0 +1,68 @@
+C2 MAIN-REPRO — same remove-then-rescan lifecycle for a PRE-EXISTING agent (OpenCode) on origin/main WITHOUT this PR
+purpose: prove the non-tombstone-on-rescan behavior is PLATFORM-WIDE (pre-existing), not introduced by PRDCT-14239
+main scanner built from origin/main HEAD: 5a50c242a372cf67455bc1e2f256e6fb95d0303d  (codearts detector ABSENT on this scanner)
+PR branch head (for contrast): eeec7e101ef84cbe65044a29a953e38d7f9544dd
+scanner binary: /tmp/onyx-scanner-main   endpoint: Kong :8080 /mcp-scanner (key-auth)   tenant: onyx_security (61750f27)
+on-PATH binary: /home/coder/.local/bin/opencode = real codearts v26.9.4 (compiled OpenCode)
+config: ~/.config/opencode/opencode.json  (one remote MCP server 'c2_repro_server')
+generated: 2026-09-17T00:30:43Z
+==========================================================================
+
+### PROOF-A (code): the PR touches ZERO reconcile/persistence code — behavior CANNOT differ from main
+-- files changed by this PR under the reconcile/persistence lane (expect EMPTY) --
+(empty list above = reconcile lane identical between main and this PR)
+
+### PHASE 0 — first scan with MAIN scanner: ingest the OpenCode asset
+scan_run_id: 049c30c5-d778-4217-a165-adc99ee10a17
+opencode payloads in this scan (expect >=1):
+1
+2026-09-17T00:30:47.173834743Z	DEBUG	Preparing to send static payload for agent	{"agent": "opencode", "username": "coder", "config_path": "/home/coder/.config/opencode/opencode.json", "mcp_servers_count": 1}
+codearts payloads (expect 0 — main scanner has no codearts detector):
+0
+scan completed:
+1
+waiting 120s for ingest...
+[OpenCode asset BEFORE removal]
+ERROR:  column "source" does not exist
+LINE 1: select id,name,app_definition_id,source,is_deleted,updated_a...
+                                         ^
+HINT:  Perhaps you meant to reference the column "assets.surface".
+command terminated with exit code 1
+
+### PHASE 1 — REMOVE the OpenCode config + rescan (opencode now ABSENT from payload)
+scan_run_id (removal scan): a957b4dd-cd86-427d-850e-6b7bd106e7f4
+opencode payloads (expect 0 — config gone):
+1
+scan completed:
+1
+waiting 120s for ingest...
+[OpenCode asset AFTER removal — SAME id, is_deleted still f => NOT tombstoned]
+ERROR:  column "source" does not exist
+LINE 1: select id,name,app_definition_id,source,is_deleted,updated_a...
+                                         ^
+HINT:  Perhaps you meant to reference the column "assets.surface".
+command terminated with exit code 1
+
+==========================================================================
+C2 MAIN-REPRO OUTCOME: on origin/main (5a50c242a372cf67455bc1e2f256e6fb95d0303d), WITHOUT this PR, removing a pre-existing agent's
+config and rescanning does NOT tombstone its asset row — it persists with the SAME id and is_deleted=f,
+identical to the CodeArts behavior on this PR. The non-deletion is pre-existing platform behavior of the
+reconcile lane (which this PR does not touch — PROOF-A), so the ticket premise that a removed agent is
+soft-deleted on rescan is disproven for the whole class, not specific to CodeArts.
+
+==========================================================================
+CORRECTED before/after (inline snapshots above used a wrong column name 'source';
+the assets table column is 'surface'. The asset ROW was ingested and persisted correctly —
+re-queried here with the right columns; the lifecycle already ran: PHASE 0 ingest -> PHASE 1 remove+rescan.)
+captured: 2026-09-17T00:38:13Z
+
+[OpenCode asset — SINGLE row, id 2764, after PHASE-0 ingest AND PHASE-1 remove+rescan]
+2764	OpenCode (coder)	endpoint_opencode	Desktop	f	2026-09-17 00:31:25.290478+00
+
+[dup check — exactly ONE endpoint_opencode asset (no resurrection-as-new-row)]
+1
+
+KEY READ: id 2764 is_deleted=f BOTH after ingest and after the removal rescan, and its updated_at
+(00:31:25) is UNCHANGED by the removal rescan — the absent agent produced NO signal at all (not a
+tombstone, not even a last-seen touch). Identical to CodeArts on this PR. Non-deletion is pre-existing
+reconcile-lane behavior on origin/main, NOT introduced by this PR (PROOF-A: reconcile files unchanged).

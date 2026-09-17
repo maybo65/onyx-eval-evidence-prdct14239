@@ -1,0 +1,39 @@
+S1 — five-state real-host CodeArts discovery scan (ROOT / all-users sensor identity)
+head: eeec7e101ef84cbe65044a29a953e38d7f9544dd   binary: /tmp/onyx-scanner (rebuilt 2026-09-17T00:04:38Z)
+scanner identity: euid=0 (root) — real sensor context, reads every user's /proc/<pid>/environ; HOME pinned to /home/coder (scanned user)
+spawned override-carrier processes are owned by coder(uid=1001); the ROOT scanner reads their environ (all-users path, not the shell user's own view)
+mode: real binary, --dry-run (discovery path identical to live; avoids ingesting synthetic override states)
+default config home ~/.codeartsdoer present+populated: yes
+relocated populated home: /tmp/s1-reloc-home   foreign no-config dir: /tmp/s1-foreign-dir
+generated: 2026-09-17T01:20:28Z
+==========================================================================
+
+### STATE (a) — NO OPENCODE_CONFIG_DIR live → default install inventoried
+codearts asset count: 1
+  ConfigPath -> "config_path": "/home/coder/.codeartsdoer"
+detector instances line:
+2026-09-17T01:20:43.194823183Z	DEBUG	Detector scanned	{"detector": "codearts", "username": "coder", "outcome": "config_parsed", "paths_checked": [], "instances": [{"path":"/home/coder/.codeartsdoer","config_exists":true,"mcp_servers":1}], "mcp_servers_total": 1, "duration_ms": 0}
+
+### STATE (b) — coder process exports OPENCODE_CONFIG_DIR=/tmp/s1-reloc-home while ~/.codeartsdoer stays populated → EXACTLY ONE asset on the override (root reads the coder proc environ)
+spawned coder pid 1003618, root-read environ: OPENCODE_CONFIG_DIR=/tmp/s1-reloc-home
+codearts asset count: 1
+  ConfigPath -> "config_path": "/tmp/s1-reloc-home"
+
+### STATE (c) — coder process exports OPENCODE_CONFIG_DIR="" (blank) → default STILL inventoried
+spawned coder pid 1009022, root-read environ: OPENCODE_CONFIG_DIR= [blank value]
+codearts asset count: 1
+  ConfigPath -> "config_path": "/home/coder/.codeartsdoer"
+
+### STATE (d) — coder process exports OPENCODE_CONFIG_DIR=/tmp/s1-foreign-dir (no CodeArts config) → default STILL inventoried
+spawned coder pid 1014459, root-read environ: OPENCODE_CONFIG_DIR=/tmp/s1-foreign-dir
+codearts asset count: 1
+  ConfigPath -> "config_path": "/home/coder/.codeartsdoer"
+
+### STATE (e) — NO candidate holds config (default home moved aside, no valid override) → NOTHING emitted (safe direction: under-detect a real install rather than emit a phantom asset with no config)
+codearts asset count: 0
+  (no codearts agent_detection line — nothing emitted, as expected)
+restored ~/.codeartsdoer: yes
+
+==========================================================================
+SUMMARY (asset count per state): a=1 b=1 c=1 d=1 e=0
+EXPECT: a=1(default) b=1(override) c=1(default) d=1(default) e=0(nothing) — no double-count, no under-count

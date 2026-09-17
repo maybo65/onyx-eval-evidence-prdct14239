@@ -1,0 +1,13 @@
+C1 / install-detected — live real-ingest scan at head eeec7e101ef84cbe65044a29a953e38d7f9544dd
+generated: 2026-09-17T00:16:42Z   scan_run_id: f28442c7-8f8c-4d2b-9606-fe39622e1c1e
+identity: coder (uid 1001); scanned user coder; endpoint http://localhost:8080/mcp-scanner (Kong key-auth)
+---- codearts detection + payload POST (live, dry_run:false) ----
+2026-09-17T00:15:46.500164568Z	DEBUG	Preparing to send static payload for agent	{"agent": "codearts", "username": "coder", "config_path": "/home/coder/.codeartsdoer", "mcp_servers_count": 1}
+2026-09-17T00:15:46.506547608Z	DEBUG	payload sent to backend	{"payload_id": "scanner-agent-codearts-8c1cec31-9b54-44e4-9c5b-6dce7d775f44", "size_bytes": 1214}
+2026-09-17T00:16:42.397293863Z	INFO	Scan completed successfully
+=== fresh scanner_installations (this scan) + single codearts asset upsert ===
+24	dev	2	2026-09-17 00:14:50+00
+23	dev	2	2026-09-16 19:55:22+00
+-- codearts asset count (MUST be 1) + last_seen touch --
+1
+230	CodeArts (ca-home, coder, home, r7-ca-home)	endpoint_codearts::ec2655c5960b39f8c1248291a967848f	2026-09-17 00:15:00.887755+00

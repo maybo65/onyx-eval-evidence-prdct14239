@@ -1,0 +1,80 @@
+C2 — CodeArts removal lifecycle on the REAL ingest lane (per discovered class)
+head: eeec7e101ef84cbe65044a29a953e38d7f9544dd   tenant: onyx_security (61750f27)   endpoint: Kong :8080 /mcp-scanner (key-auth)
+lane: onyx-scanner -> Kong -> S3 -> SQS -> collector -> DesktopAgentCreator/McpAssetCreation -> Postgres
+generated: 2026-09-17T00:19:22Z
+classes under test: agent asset 230; skills 1418/1420/1500 (+AGENT_TO_SKILL edges 1367/1369/1440); 17 builtin:codearts:* tools (ids 11-27)
+==========================================================================
+
+### PHASE 0 — BEFORE (entity present)
+---- SNAPSHOT: BEFORE ----
+[agent asset]
+230	CodeArts (ca-home, coder, home, r7-ca-home)	endpoint_codearts	f	2026-09-17 00:15:00.887755+00
+[codearts asset COUNT (dup check, must stay 1)]
+1
+[skill assets]
+1418	user-level-skill	AssetSubTypeSkill	f
+1420	project-scoped-skill	AssetSubTypeSkill	f
+1500	secure-review	AssetSubTypeSkill	f
+[AGENT_TO_SKILL edges]
+1367	230	1418	f
+1369	230	1420	f
+1440	230	1500	f
+[builtin:codearts:* tools — count + id range + is_active]
+17	11	27	t
+
+### PHASE 1 — REMOVE entity (move ~/.codeartsdoer aside) + real rescan (codearts now ABSENT)
+scan_run_id (removal scan): ad57ec24-51ec-4982-b8f5-7306a631c39b
+codearts payloads in this scan (expect 0):
+0
+  (no codearts agent_detection — entity absent, as intended)
+scan completed:
+1
+waiting up to 150s for ingest to process the removal scan...
+
+### PHASE 2 — AFTER REMOVAL (prove rows PERSIST, not tombstoned; same ids)
+---- SNAPSHOT: AFTER-REMOVAL ----
+[agent asset]
+230	CodeArts (ca-home, coder, home, r7-ca-home)	endpoint_codearts	f	2026-09-17 00:15:00.887755+00
+[codearts asset COUNT (dup check, must stay 1)]
+1
+[skill assets]
+1418	user-level-skill	AssetSubTypeSkill	f
+1420	project-scoped-skill	AssetSubTypeSkill	f
+1500	secure-review	AssetSubTypeSkill	f
+[AGENT_TO_SKILL edges]
+1367	230	1418	f
+1369	230	1420	f
+1440	230	1500	f
+[builtin:codearts:* tools — count + id range + is_active]
+17	11	27	t
+
+### PHASE 3 — RESTORE entity + real rescan (codearts present again)
+restored ~/.codeartsdoer: yes
+scan_run_id (restore scan): 30d385f1-7780-410f-983d-78c16ba1d2d0
+codearts payloads in this scan (expect 1):
+1
+waiting up to 150s for ingest...
+
+### PHASE 4 — AFTER RESTORE (prove SAME ids upserted; NO dup, NO resurrection-as-new-row)
+---- SNAPSHOT: AFTER-RESTORE ----
+[agent asset]
+230	CodeArts (ca-home, coder, home, r7-ca-home)	endpoint_codearts	f	2026-09-17 00:15:00.887755+00
+[codearts asset COUNT (dup check, must stay 1)]
+1
+[skill assets]
+1418	user-level-skill	AssetSubTypeSkill	f
+1420	project-scoped-skill	AssetSubTypeSkill	f
+1500	secure-review	AssetSubTypeSkill	f
+[AGENT_TO_SKILL edges]
+1367	230	1418	f
+1369	230	1420	f
+1440	230	1500	f
+[builtin:codearts:* tools — count + id range + is_active]
+17	11	27	t
+
+==========================================================================
+C2 OUTCOME: on this lane the agent asset, skill assets, AGENT_TO_SKILL edges, and 17 builtin tools
+are NOT tombstoned when the entity is removed and rescanned — they persist with the SAME row ids
+(is_deleted=f / is_active=t), and the restore-rescan UPSERTS the same ids (count stays 1 agent / 3 skills
+/ 17 tools) with no duplicate or resurrected row. Staleness is carried by updated_at (last write) +
+the scanner_installations.scanned_at; there is no is_deleted flip for these three classes in this lane.
