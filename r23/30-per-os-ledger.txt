@@ -1,0 +1,12 @@
+C1 per-OS ledger (r23, honest):
+- linux/amd64: FULL live chain proven on this host — discovery scan, guard install, live TUI
+  allow/deny for tool-exec + prompt + tool-output lanes, MCP sanction deny/allow (r22+r23 evidence).
+- macOS (darwin/arm64, darwin/amd64): guard installer + scanner CROSS-COMPILE clean
+  (r22/cross-platform/00) and the installer's OS split is real code (chown_unix.go). A LIVE
+  macOS host run is NOT captured: no macOS host on this box, and GitHub-hosted mac runners
+  cannot reach the cluster-internal guard endpoint; no Huawei AK/SK in org CI secrets.
+  Discovery on macOS finds no CodeArts asset BY DESIGN (scanner/tools/dsl_agents/codearts.py
+  build()->None off-Linux) — S3/C1 owner decision.
+- Windows (windows/amd64, windows/arm64): same as macOS — cross-compile + chown_windows.go
+  no-op proven (r22/cross-platform/02); live host run blocked for the same reasons; the
+  retired Windows lab box (10.2.7.152, eu-west-3) has no replacement (scanner/CLAUDE.md).

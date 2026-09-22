@@ -1,0 +1,6 @@
+INFO  2026-09-22T18:50:56 +3ms service=plugin "loading plugin" path=file:///home/coder/.codeartsdoer/plugin/onyx-guard.ts
+INFO [bfd320cb756c4a07b0d607677a1027ae] 2026-09-22T18:50:59 +1ms service=bus "publishing" type=tui.toast.show
+INFO [c9877b71c193471b91d05ee9b4d46311] 2026-09-22T18:51:46 +1ms service=bus "publishing" type=tui.toast.show
+INFO [c9877b71c193471b91d05ee9b4d46311] 2026-09-22T18:51:46 +0ms service=bus-publish "{"type":"tui.toast.show","properties":{"title":"Onyx AI Guard","message":"Blocked by Onyx AI Guard — Violation ID: 37465270395a4ebda22998905228d981","variant":"error","duration":10000}}"
+INFO [c317b3e04e0c4884b5b346beb2316256] 2026-09-22T18:54:07 +1ms service=bus "publishing" type=tui.toast.show
+INFO [c317b3e04e0c4884b5b346beb2316256] 2026-09-22T18:54:07 +0ms service=bus-publish "{"type":"tui.toast.show","properties":{"title":"Onyx AI Guard","message":"Blocked by Onyx AI Guard — Violation ID: 7a23074ad9ec441983f98fb7d77bdf05","variant":"error","duration":10000}}"

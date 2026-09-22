@@ -1,0 +1,6 @@
+{
+ "source": "codearts",
+ "hook_type": "llm_input",
+ "data": "eyJvcGVuY29kZV92ZXJzaW9uIjogIjAuNi4zIiwgInJ1bl9pZCI6ICJyMjMtY3VybC1sbG0tMSIsICJzZXNzaW9uX2lkIjogInIyMy1jdXJsLXNlc3Npb24iLCAicHJvdmlkZXIiOiAiaHVhd2VpY2xvdWQtbWFhcyIsICJtb2RlbCI6ICJHTE0tNS4xIiwgInByb21wdCI6ICJwbGVhc2Ugc3VtbWFyaXplIG9ueXgtZ3VhcmQtcHJvbXB0LXByb2JlLXIyMyBmb3IgbWUiLCAic3lzdGVtX3Byb21wdCI6IG51bGwsICJoaXN0b3J5X21lc3NhZ2VfY291bnQiOiAwLCAiaW1hZ2VzX2NvdW50IjogMH0=",
+ "timestamp": "2026-09-22T10:41:34.240606Z"
+}
