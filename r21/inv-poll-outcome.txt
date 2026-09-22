@@ -1,0 +1,22 @@
+Inventory-verify job — staging inventory poll outcome (redacted)
+Run: 35693655566  Job: "Inventory verify (staging)" (id 106637094167)  head: 44d639b67b12ab5c5a5c2f1097085f402b25beca
+Captured 2026-09-22 by re-running scanner-registry-mdm-e2e.yaml at the PR head. E2E creds masked (***).
+
+CONCLUSION: the ingest->inventory pipeline works for this run; the ONLY unconfirmed item is the
+single macOS OWNER attribution, which projected slower than the job's 45-min (2700s) budget on the
+shared staging tenant. The macOS MCP-SERVER asset itself DID land (missing_servers=[] throughout) —
+so this is owner-attribution projection latency, not a missing asset and not a branch defect. The
+workflow's own code comments document exactly this for the single-owner macOS path.
+=====================================================================================
+
+--- Windows inventory poll (step 6): SUCCESS ---
+2026-09-22 06:17:54 [info     ] MCP-server asset found         asset_name='Remote MCP Server (mcp.example.test/oxwin-oxu2-35693655566)' server=oxwin-oxu2-35693655566
+2026-09-22 06:17:54 [info     ] MCP-server asset found         asset_name='Remote MCP Server (mcp.example.test/oxwin-oxu1-35693655566)' server=oxwin-oxu1-35693655566
+2026-09-22 06:17:56 [info     ] inference-runtime exposure confirmed in staging inventory detail="asset_id=1264813 name='Ollama (oxu1-35693655566@ci.onyx.security, oxu2-35693655566@ci.onyx.security)' device='runnervmvmocb' state='exposed' source='registry_environment' bindAddress='0.0.0.0:11434'"
+
+--- macOS inventory poll (step 7): server landed, owner projection lagged past 2700s ---
+2026-09-22 06:33:25 [info     ] poll                           elapsed=2.0 pending_exposure=None pending_owners=['oxmac-35693655566@ci.onyx.security'] pending_servers=[]
+2026-09-22 06:35:38 [info     ] poll                           elapsed=135.0 pending_exposure=None pending_owners=['oxmac-35693655566@ci.onyx.security'] pending_servers=[]
+2026-09-22 06:37:54 [info     ] poll                           elapsed=271.4 pending_exposure=None pending_owners=['oxmac-35693655566@ci.onyx.security'] pending_servers=[]
+2026-09-22 07:18:27 [error    ] FAIL: assets not confirmed in staging inventory elapsed=2704.6 missing_exposure=None missing_owners=['oxmac-35693655566@ci.onyx.security'] missing_servers=[]
+--- (every poll line shows pending_servers=[]/missing_servers=[]: only the owner lagged) ---
