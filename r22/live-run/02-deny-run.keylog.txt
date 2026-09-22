@@ -1,0 +1,6 @@
+INFO  2026-09-22T17:44:28 +3ms service=plugin "loading plugin" path=file:///home/coder/.codeartsdoer/plugin/onyx-guard.ts
+INFO [361d298d2412483d8b08e547ab56d405] 2026-09-22T17:44:33 +0ms service=bus "publishing" type=tui.toast.show
+INFO [361d298d2412483d8b08e547ab56d405] 2026-09-22T17:44:33 +0ms service=bus-publish "{"type":"tui.toast.show","properties":{"message":"Initializing MCP server...","variant":"info","duration":30000}}"
+INFO [59299ba27ba94c328fe3b47c88f70ec3] 2026-09-22T17:44:40 +1ms service=bus "publishing" type=tui.toast.show
+INFO [59299ba27ba94c328fe3b47c88f70ec3] 2026-09-22T17:44:40 +1ms service=bus-publish "{"type":"tui.toast.show","properties":{"title":"Onyx AI Guard","message":"Blocked by Onyx AI Guard — Violation ID: 6ce7a84d35e54e9e8f5d28f8f6027e7e","variant":"error","duration":10000}}"
+INFO [361d298d2412483d8b08e547ab56d405] 2026-09-22T17:44:49 +2ms service=plugin "loading plugin" path=file:///home/coder/.codeartsdoer/plugin/onyx-guard.ts

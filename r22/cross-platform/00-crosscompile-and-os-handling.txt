@@ -1,0 +1,28 @@
+=== cross-compile the scanner (which bundles+installs the guard plugin) for mac/Win ===
+OK  darwin/arm64 -> /tmp/onyx-scanner-darwin-arm64: Mach-O 64-bit arm64 executable, flags:<|DYLDLINK|PIE>
+OK  darwin/amd64 -> /tmp/onyx-scanner-darwin-amd64: Mach-O 64-bit x86_64 executable, flags:<|DYLDLINK|PIE>
+OK  windows/amd64 -> /tmp/onyx-scanner-windows-amd64.exe: PE32+ executable (console) x86-64, for MS Windows
+OK  windows/arm64 -> /tmp/onyx-scanner-windows-arm64.exe: PE32+ executable (console) Aarch64, for MS Windows
+=== does the installer have OS-specific handling for darwin/windows? ===
+internal/installer/claude_combined_installer.go:64:			"event", "baseurl_install_outcome", "platform", runtime.GOOS,
+internal/installer/claude_combined_installer.go:101:			"event", "baseurl_uninstall_outcome", "platform", runtime.GOOS,
+internal/installer/claude_combined_installer.go:112:			"event", "hooks_uninstall_outcome", "platform", runtime.GOOS,
+internal/installer/chown_unix.go:1://go:build !windows
+internal/installer/chown_unix.go:51:				"platform", runtime.GOOS,
+internal/installer/chown_unix.go:60:			"platform", runtime.GOOS,
+internal/installer/chown_unix.go:88:				"platform", runtime.GOOS,
+internal/installer/chown_unix.go:107:			"platform", runtime.GOOS,
+internal/installer/chown_unix.go:116:			"platform", runtime.GOOS,
+internal/installer/chown_windows.go:1://go:build windows
+internal/installer/claude_base_url_installer.go:183:				"event", "base_url_install", "platform", runtime.GOOS, "op", "skip", "outcome", "skipped",
+internal/installer/claude_base_url_installer.go:222:				"key", k, "dest", settings.Path, "platform", runtime.GOOS)
+internal/installer/claude_base_url_installer.go:228:			"key", k, "platform", runtime.GOOS)
+internal/installer/claude_base_url_installer.go:255:			"event", "base_url_install", "platform", runtime.GOOS, "op", "override", "outcome", "overridden",
+internal/installer/claude_mcp_timeout.go:95:			"platform", runtime.GOOS, "path", settingsPath, "error", err)
+internal/installer/claude_mcp_timeout.go:127:			"reason", "claude_code_not_installed", "platform", runtime.GOOS, "path", settings.Path)
+internal/installer/claude_mcp_timeout.go:142:			"existing_ms", existing, "floor_ms", timeoutMs, "platform", runtime.GOOS, "path", settings.Path)
+internal/installer/claude_mcp_timeout.go:152:			"floor_ms", timeoutMs, "platform", runtime.GOOS, "path", settings.Path)
+internal/installer/claude_mcp_timeout.go:168:		"previous_ms", existing, "floor_ms", timeoutMs, "platform", runtime.GOOS, "path", settings.Path)
+internal/installer/codepuppy_plugin_installer.go:106:			"platform", runtime.GOOS,
+
+[exited with code 0]

@@ -1,0 +1,50 @@
+                                                                                                                                                           █
+  |                                                                                                                                                        █    Shell command: onyx runtime guard
+  |  Run this exact shell command using your bash tool, nothing else: echo on|                                                                             |    probe
+  |                                                                          |  Onyx AI Guard                                                              |
+                                                                             |                                                                             |    Context
+  |  Thinking: The user wants me to run a simple echo command.               |  Blocked by Onyx AI Guard — Violation ID: 9ae4f01a5cad417aa563390f2bc79e63  |    21,061 tokens
+                                                                             |                                                                             |    10% used
+     $ echo onyx-codearts-runtime-guard-probe                                                                                                              █
+     Blocked by Onyx AI Guard                                                                                                                              █    Session
+     Your request was blocked by Onyx AI Guard.                                                                                                            █    Id: ses_f377751a1ffer1wnEXQDqptQsU
+     Violated rules: Block CodeArts shell command                                                                                                          █    Total Tokens: 42.0K
+     Onyx Violation ID: 9ae4f01a5cad417aa563390f2bc79e63                                                                                                   █    Input Tokens: 41.9K
+                                                                                                                                                           █    Output Tokens: 0.1K
+     The command was blocked by Onyx AI Guard (violation ID: 9ae4f01a5cad417aa563390f2bc79e63). The guard rule "Block CodeArts shell command" prevented    █    Cached Tokens: 23.7K(56.5%)
+     execution.                                                                                                                                            █
+                                                                                                                                                           █    MCP
+     ▣  Build · GLM-5.1 · 14.9s                                                                                                                            █    • onyx-verify-probe SSE error: Was
+                                                                                                                                                           █      there a typo in the url or port?
+                                                                                                                                                           █
+                                                                                                                                                           █    Run Mode
+                                                                                                                                                           █    Sandbox
+                                                                                                                                                           █
+                                                                                                                                                           █    Allowed Commands: 0
+                                                                                                                                                           █    Network Policy: Deny All
+                                                                                                                                                           █
+                                                                                                                                                           █    Codebase Local Indexing
+                                                                                                                                                           █    ● unbuilt
+                                                                                                                                                           █    ○ building
+                                                                                                                                                           █    ○ built
+                                                                                                                                                           █
+                                                                                                                                                           █    Codebase Indexing
+                                                                                                                                                           █    ● unbuilt
+                                                                                                                                                           █    ○ building
+                                                                                                                                                           █    ○ built
+                                                                                                                                                           █
+                                                                                                                                                           █
+                                                                                                                                                           █
+                                                                                                                                                           █
+                                                                                                                                                           █
+                                                                                                                                                           █
+                                                                                                                                                           █
+                                                                                                                                                           █
+
+  |
+  |
+  |
+  |  Build  GLM-5.1 huaweicloud-maas                                                                                                                            /tmp/r22-tui-workdir
+  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+                                                                                                                                21.1K (10%)  ctrl+p commands    • CodeArts 26.9.4
+

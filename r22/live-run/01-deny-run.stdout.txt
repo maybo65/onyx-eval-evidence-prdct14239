@@ -1,0 +1,1 @@
+The command was blocked by **Onyx AI Guard** with the violation: "Block CodeArts shell command" (Violation ID: `6ce7a84d35e54e9e8f5d28f8f6027e7e`).

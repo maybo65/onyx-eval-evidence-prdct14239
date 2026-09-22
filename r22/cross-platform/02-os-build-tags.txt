@@ -1,0 +1,6 @@
+=== OS-split installer files (build constraints) ===
+==> internal/installer/chown_unix.go <==
+//go:build !windows
+
+==> internal/installer/chown_windows.go <==
+//go:build windows
