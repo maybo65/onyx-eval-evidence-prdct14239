@@ -1,0 +1,34 @@
+CodeArts CLI - live Huawei MaaS auth + inference proof (round 21)
+captured_at (UTC): 2026-09-22T06:19:05Z
+host: agent-factory dev box (Linux x86_64)
+cli: codearts 26.9.4  (config home ~/.codeartsdoer)
+region: ap-southeast-1
+credential on box: CODEARTS_CLI_AK (len=20, value <REDACTED>), CODEARTS_CLI_SK (len=40, value <REDACTED>)
+model: huaweicloud-maas/GLM-5.1
+command (per attempt): codearts run "Reply with EXACTLY this token and nothing else: <fresh-nonce>" --model huaweicloud-maas/GLM-5.1
+
+RESULT: 3 of 3 attempts returned a live GLM-5.1 completion that echoed the fresh per-run
+nonce EXACTLY. A per-run nonce cannot be pre-baked, so an exact echo proves a live
+authenticated round-trip to Huawei MaaS, not a cached/stub reply.
+
+attempt 1: rc=0 nonce=onyx-r21-a1-1790057871-8616 echoed=1 out_tail=[onyx-r21-a1-1790057871-8616 ]
+  stderr_tail: [> build · GLM-5.1 [0m ]
+attempt 2: rc=0 nonce=onyx-r21-a2-1790057889-16872 echoed=1 out_tail=[onyx-r21-a2-1790057889-16872 ]
+  stderr_tail: [> build · GLM-5.1 [0m ]
+attempt 3: rc=0 nonce=onyx-r21-a3-1790057908-7420 echoed=1 out_tail=[onyx-r21-a3-1790057908-7420 ]
+  stderr_tail: [> build · GLM-5.1 [0m ]
+=== SUMMARY: 3/3 attempts echoed the nonce ===
+
+INTERPRETATION (honest):
+  * Huawei MaaS auth + GLM-5.1 inference GENUINELY WORK from this box with the AK/SK present.
+    This empirically REFUTES any earlier claim that a real CodeArts session cannot start /
+    returns 503 / the box holds no valid Huawei credential. Those claims were WRONG and are
+    corrected in the PR body's evidence ledger.
+  * SEPARATE, still-blocked item: a live in-TUI Onyx guard BLOCK verdict. The guard route
+    (POST /api/sanitization/v1/guard/evaluate/<source>/<apikey> via Kong) currently returns
+    401 for every key available on this box (MCP_GATEWAY_DEV_KEY, the scanner's baked key,
+    direct-to-pod) -> the codearts guard virtual key is not bound to a policy in the current
+    cluster DB (drift documented since Sep-13). So the guard scanner fails OPEN (allow) and a
+    genuine allow->deny->allow INSIDE a live CodeArts TUI is NOT reproducible this round.
+    The genuine guard allow->deny->allow was captured Sep-13 (evidence 14/15/17) when a
+    Block-action policy was bound; that pipeline proof stands, but it is NOT a live-TUI still.
