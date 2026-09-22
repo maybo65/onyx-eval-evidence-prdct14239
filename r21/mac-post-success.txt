@@ -1,0 +1,83 @@
+macOS registry-MDM job — POST-to-staging-ingest SUCCESS (redacted)
+Run: 35693655566  Job: "macOS registry MDM (root normalization)" (id 106635738577)
+Head sha at capture: 44d639b67b12ab5c5a5c2f1097085f402b25beca  Runner: macos-26-arm64 (Azure westus)
+Captured 2026-09-22 by re-running scanner-registry-mdm-e2e.yaml at the PR head.
+Secrets (staging ingest api-key) redacted. This is the real darwin scan + real POST
+to the real staging ingest endpoint — it exits 0, i.e. the branch's darwin path works.
+=====================================================================================
+
+##[group]Run go build -o ../bin/onyx-scanner .
+go build -o ../bin/onyx-scanner .
+shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+env:
+  E2E_CRUD_BASE_URL: https://app.aws-use1-c01.onyx-staging.app
+##[endgroup]
+# github.com/shoenig/go-m1cpu
+##[error]../../../../go/pkg/mod/github.com/shoenig/go-m1cpu@v0.1.6/cpu.go:75:17: warning: variable length array folded to constant array as an extension [-Wgnu-folding-constant]
+##[error]../../../../go/pkg/mod/github.com/shoenig/go-m1cpu@v0.1.6/cpu.go:77:16: warning: variable length array folded to constant array as an extension [-Wgnu-folding-constant]
+##[group]Run set -euo pipefail
+set -euo pipefail
+mkdir -p /tmp/evidence "$GITHUB_WORKSPACE/artifacts"
+SERVER="oxmac-runner-${RUN}"; EMAIL="oxmac-${RUN}@ci.onyx.security"
+SKILL="oxskill-${RUN}"; PROJ="/tmp/oxmac-proj-${RUN}"
+mkdir -p "$PROJ/.claude/skills/$SKILL"
+printf '{ "mcpServers": { "%s": { "type": "http", "url": "https://mcp.example.test/%s" } } }\n' "$SERVER" "$SERVER" > "$PROJ/.mcp.json"
+printf -- '---\nname: %s\ndescription: onyx registered-projects e2e skill\n---\n# %s\n' "$SKILL" "$SKILL" > "$PROJ/.claude/skills/$SKILL/SKILL.md"
+printf '{ "oauthAccount": { "emailAddress": "%s" }, "projects": { "%s": {} } }\n' "$EMAIL" "$PROJ" > "$HOME/.claude.json"
+mkdir -p "$HOME/.local/bin"
+printf '#!/bin/sh\necho onyx-e2e-claude-stub\n' > "$HOME/.local/bin/claude"; chmod +x "$HOME/.local/bin/claude"
+sudo mkdir -p /usr/local/bin; sudo cp "$HOME/.local/bin/claude" /usr/local/bin/claude
+ls -l /tmp | grep -E '(^l|tmp)' | head -3 > "$GITHUB_WORKSPACE/artifacts/NN-mac-symlink.txt" || true
+{ echo "=== /tmp symlink ==="; ls -ld /tmp; echo "=== ~/.claude.json ==="; cat "$HOME/.claude.json"; } >> "$GITHUB_WORKSPACE/artifacts/NN-mac-symlink.txt"
+echo "seeded server=$SERVER email=$EMAIL project=$PROJ"
+shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+env:
+  E2E_CRUD_BASE_URL: https://app.aws-use1-c01.onyx-staging.app
+  RUN: 35693655566
+##[endgroup]
+seeded server=oxmac-runner-35693655566 email=oxmac-35693655566@ci.onyx.security project=/tmp/oxmac-proj-35693655566
+##[group]Run set -uo pipefail
+set -uo pipefail
+# GitHub's `shell: bash` runs with errexit on; disable it around the
+# scan so a non-zero POST still records rc + copies the ingest log to
+# artifacts (the capture exists precisely for the failure path), then
+# re-enable and exit with the real code. Mirrors the root POST step.
+mkdir -p /tmp/evidence "$GITHUB_WORKSPACE/artifacts"
+set +e
+./bin/onyx-scanner scan --endpoint "$INGEST" --api-key "$APIKEY" --full-scan=true --full-scan-depth=1 --scan-dockers=false -v > /tmp/evidence/mac-user.log 2>&1
+rc=$?
+set -e
+cp /tmp/evidence/mac-user.log "$GITHUB_WORKSPACE/artifacts/NN-mac-user-ingest-status.txt"
+echo "user-context POST exit=$rc" | tee -a "$GITHUB_WORKSPACE/artifacts/NN-mac-user-ingest-status.txt"
+tail -5 /tmp/evidence/mac-user.log || true
+exit $rc
+shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+env:
+  E2E_CRUD_BASE_URL: https://app.aws-use1-c01.onyx-staging.app
+  INGEST: https://0vga544u1v.ingest.onyx-staging.app/mcp-scanner
+  APIKEY: <REDACTED-STAGING-INGEST-KEY>
+##[endgroup]
+user-context POST exit=0
+│    Agent    │        Skill        │ Content Hash │ Scripts │
+├─────────────┼─────────────────────┼──────────────┼─────────┤
+│ claude-code │ oxskill-35693655566 │ 6add66cccaa9 │ 0       │
+└─────────────┴─────────────────────┴──────────────┴─────────┘
+
+##[group]Run set -uo pipefail
+set -uo pipefail
+# Capture the scan rc explicitly (mirrors the ingest steps) instead of
+# `|| true`: a non-zero root scan would otherwise be swallowed, and a
+# missing mac-root.jsonl then surfaced as an opaque `cp` error that masks
+# the assert's readable FAIL. Copy the log + payload best-effort (|| true
+# on the cp of a possibly-missing file), record the rc, then let the
+# assert produce the real, readable verdict on whatever landed.
+set +e
+sudo -E env -i HOME=/var/root PATH="$PATH" ./bin/onyx-scanner scan \
+  --output-file /tmp/evidence/mac-root.jsonl --full-scan=true --full-scan-depth=1 -v > /tmp/evidence/mac-root.log 2>&1
+rc=$?
+set -e
+sudo chmod -R a+r /tmp/evidence || true
+cp /tmp/evidence/mac-root.log "$GITHUB_WORKSPACE/artifacts/NN-mac-root-run.txt" || true
+cp /tmp/evidence/mac-root.jsonl "$GITHUB_WORKSPACE/artifacts/NN-mac-payload.txt" || true
+echo "root scan exit=$rc" | tee -a "$GITHUB_WORKSPACE/artifacts/NN-mac-root-run.txt"
+python3 scanner/test/detector-install/assert_mac_root_attribution.py "oxmac-runner-${RUN}" /tmp/evidence/mac-root.jsonl | tee -a "$GITHUB_WORKSPACE/artifacts/NN-mac-root-run.txt"
